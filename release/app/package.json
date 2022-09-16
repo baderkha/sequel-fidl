@@ -14,5 +14,8 @@
     "postinstall": "npm run electron-rebuild && npm run link-modules",
     "link-modules": "node -r ts-node/register ../../.erb/scripts/link-modules.ts"
   },
-  "dependencies": {}
+  "dependencies": {
+    "sequelize": "^6.22.0",
+    "sqlite3": "^5.1.1"
+  }
 }

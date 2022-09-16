@@ -124,12 +124,10 @@
     "find-free-port": "^2.0.0",
     "find-free-ports": "^3.0.0",
     "framer-motion": "^7.3.5",
-    "mysql2": "^2.3.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.3.0",
-    "sequelize": "^6.21.6",
-    "sqlite3": "^5.0.11",
+    "sequelize": "^6.22.0",
     "uuid": "^9.0.0",
     "xdg-app-paths": "^8.2.0"
   },

@@ -26,7 +26,7 @@ const main = async () => {
         PlayGroundManger.Default()
     );
 
-    const [res, _] = await ser.newPlayground('MYSQL', '5.7');
+    const [res] = await ser.newPlayground('MYSQL', '5.7');
 
     const [conID] = await ser.connectToLivePlayground(res.pground, res.procId);
 

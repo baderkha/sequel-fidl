@@ -1,7 +1,7 @@
 import { ErrorTuple, NewErrorTuple } from '../util/tuple';
 import { DBType } from '../model/Connections';
 import { PlaygroundConnection } from '../model/PlaygroundConnection';
-import { IPlaygroundConnectionRepo } from '../repository/PlaygroundConnection';
+import { IPlaygroundConnectionRepo, PlaygroudConnectionsRepoSQLite } from '../repository/PlaygroundConnection';
 import { CreateConnection } from './db/ConnectionFactory';
 import { ConManager } from './Connections';
 import { PlayGroundManger } from './db/PlaygroundManager';
@@ -9,6 +9,8 @@ import { DBService } from './DbService';
 import { Make } from '../util/object';
 import { LiveConnection } from '../model/LiveConnection';
 import { ILiveConnectionRepo } from '../repository/LiveConnection';
+import { GetDBConnection } from 'main/config';
+import { LiveConnectionSQLiteRepo } from 'main/repository/LiveConnectionSQLite';
 
 export type PGroundOptions = {
     DB: DBType;
@@ -33,6 +35,7 @@ export type DatabaseSupported = Map<DBType, Array<string>>;
 export class PlaygroundService extends DBService {
     private pgroundMgr: PlayGroundManger;
     private repo: IPlaygroundConnectionRepo;
+    private static _instance : PlaygroundService;
 
     constructor(
         mgr: ConManager,
@@ -43,6 +46,19 @@ export class PlaygroundService extends DBService {
         super(mgr, liveConRepo);
         this.pgroundMgr = pgroundMgr;
         this.repo = repo;
+    }
+
+    public static Default() : PlaygroundService {
+        if (!PlaygroundService._instance) {
+            const db = GetDBConnection();
+            const liveConRepo = new LiveConnectionSQLiteRepo(new LiveConnection(),db)
+            const playGroundRepo = new PlaygroudConnectionsRepoSQLite(new PlaygroundConnection(),db)
+            PlaygroundService._instance = new PlaygroundService (ConManager.GetInstance(),
+            liveConRepo,
+            playGroundRepo,
+            PlayGroundManger.Default())
+        }
+        return PlaygroundService._instance;
     }
 
     async newPlayground(
