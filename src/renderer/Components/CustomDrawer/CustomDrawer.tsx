@@ -40,6 +40,7 @@ export default function CustomDrawer(props: CustomDrawerProps) {
             PaperProps={{
                 style: { width: drawerWidth },
                 sx: {
+                    marginTop: '32px',
                     backgroundColor: '#f0f0f0',
                     flexShrink: 0,
                     '& .MuiDrawer-paper': {

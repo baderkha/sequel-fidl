@@ -1,7 +1,7 @@
 import { NewTuple, Tuple } from '../util/tuple';
 import { Sequelize } from 'sequelize';
 import { v4 } from 'uuid';
-import { pubsub } from '../util/pubsub';
+import { ipcMain } from 'electron';
 
 export type ConFailEv = {
     connectionID: string;
@@ -57,7 +57,7 @@ export class ConManager {
                     connectionID: connectionId,
                 };
 
-                pubsub.emit(ConManager.ConnectionFailureEvent, failEv);
+                ipcMain.emit(ConManager.ConnectionFailureEvent, failEv);
                 this.Remove(connectionId); // once it has failed , remove the connection from the pool
             }
         }, 1 * ConManager.Second);
@@ -85,7 +85,7 @@ export class ConManager {
             const conKilledEv: ConnectionKilledEvent = {
                 connectionID: connectionId,
             };
-            pubsub.emit(ConManager.ConnectionKilledEvent, conKilledEv);
+            ipcMain.emit(ConManager.ConnectionKilledEvent, conKilledEv);
         }
 
         return Promise.resolve(this.cons.delete(connectionId));

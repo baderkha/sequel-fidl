@@ -7,7 +7,8 @@ import {
     IDBProcess,
 } from '../../util/db_process';
 import { rmdirSync } from 'fs';
-import { pubsub, UNEXPECTED_ERROR_LOG } from '../pubsub';
+import { UNEXPECTED_ERROR_LOG } from '../pubsub';
+import { ipcMain } from 'electron';
 
 /**
  * MYSQL Process manger via docker.
@@ -80,7 +81,7 @@ export class MYSQLDocker extends BaseDockerDB implements IDBProcess {
             rmdirSync(statePathToDelete);
         } catch (err) {
             const msg = `unexpected folder delete err ${err}`;
-            pubsub.emit(UNEXPECTED_ERROR_LOG, msg);
+            ipcMain.emit(UNEXPECTED_ERROR_LOG, msg);
         }
 
         return Promise.resolve();

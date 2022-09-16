@@ -14,7 +14,7 @@ import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
-import { pubsub, SHUTDOWN_SERVICE_EV } from './util/pubsub';
+import { SHUTDOWN_SERVICE_EV } from './util/pubsub';
 
 class AppUpdater {
     constructor() {
@@ -128,11 +128,11 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
-    pubsub.emit(SHUTDOWN_SERVICE_EV);
+    ipcMain.emit(SHUTDOWN_SERVICE_EV);
 });
 
 ipcMain.on('app_quit', () => {
-    pubsub.emit(SHUTDOWN_SERVICE_EV);
+    ipcMain.emit(SHUTDOWN_SERVICE_EV);
 });
 
 app.whenReady()

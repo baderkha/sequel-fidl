@@ -7,7 +7,9 @@ import { PlayGroundManger } from './service/db/PlaygroundManager';
 import { PlaygroundService } from './service/PlaygroundService';
 import { Sequelize } from 'sequelize';
 import { migrate } from './util/store/model';
-import { pubsub, SHUTDOWN_SERVICE_EV } from './util/pubsub';
+import { SHUTDOWN_SERVICE_EV } from './util/pubsub';
+import { ipcMain } from 'electron';
+import { MYSQLAdminCommand } from './util/sql_admin_commands/MYSQLAdminCommand';
 
 const main = async () => {
     const db = new Sequelize('sqlite::memory:');
@@ -26,7 +28,7 @@ const main = async () => {
         PlayGroundManger.Default()
     );
 
-    const [res] = await ser.newPlayground('MYSQL', '5.7');
+    const [res] = await ser.newPlayground('mysql', '5.7');
 
     const [conID] = await ser.connectToLivePlayground(res.pground, res.procId);
 
@@ -36,7 +38,7 @@ const main = async () => {
     console.log(
         await ser.RunSQL(
             conID,
-            `CREATE TABLE authors (id INT, name VARCHAR(20), email VARCHAR(20));`
+            `CREATE TABLE authors (id INT PRIMARY KEY, name VARCHAR(20), email VARCHAR(20));`
         )
     );
     console.log(
@@ -56,12 +58,37 @@ const main = async () => {
             4
         )
     );
+
+    const adminCommands = new MYSQLAdminCommand();
+    let [_, con] = ConManager.GetInstance().GetConById(conID);
+    console.log(
+        await adminCommands.CreateTable(con, 'author_v2', [
+            {
+                FieldName: 'id',
+                IsPrimaryKey: true,
+                Default: 'AUTO_INCREMENT',
+                NullAllowed: false,
+                Type: 'INT(11)',
+            },
+            {
+                FieldName: 'first_name',
+                IsPrimaryKey: false,
+                Default: '',
+                NullAllowed: true,
+                Type: 'VARCHAR(255)',
+            },
+        ])
+    );
+    console.log(await adminCommands.ShowAllTables(con));
+    console.log(await adminCommands.ShowCreateSQL(con, 'authors'));
+    console.log(await adminCommands.ListDatabases(con));
+    console.log(await adminCommands.ShowSchema(con, 'authors'));
 };
 
 (async () => {
     await main();
     let num = 1;
     if (1 == num) {
-        pubsub.emit(SHUTDOWN_SERVICE_EV, true);
+        ipcMain.emit(SHUTDOWN_SERVICE_EV, true);
     }
 })();

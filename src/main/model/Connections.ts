@@ -1,7 +1,13 @@
 import { DataTypes } from 'sequelize';
 import { SqlizeModelIndexed } from '../util/store/model/SequelizeModelIndexed';
 
-export type DBType = 'MYSQL' | 'SQLite' | 'Postgres' | 'MariaDB';
+export type DBType =
+    | 'mariadb'
+    | 'mssql'
+    | 'mysql'
+    | 'oracle'
+    | 'postgres'
+    | 'sqlite';
 
 /**
  * Connection Config

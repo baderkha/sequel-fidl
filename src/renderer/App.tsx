@@ -1,10 +1,10 @@
 import { MemoryRouter as Router, Routes, Route } from 'react-router-dom';
-import { TablePage } from './Pages/DB/TablePage';
+import { DBView } from './Pages/DB/DB';
 
 const Hello = () => {
     return (
         <div>
-            <TablePage></TablePage>
+            <DBView></DBView>
         </div>
     );
 };

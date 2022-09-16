@@ -1,10 +1,11 @@
 import { DBType } from '../../model/Connections';
 import { DBProcTpl, IDBProcess } from '../../util/db_process';
-import { pubsub, SHUTDOWN_SERVICE_EV } from '../../util/pubsub';
+import { SHUTDOWN_SERVICE_EV } from '../../util/pubsub';
 import { MYSQLDocker } from '../../util/db_process/MYSQL';
 import { DockerCLI } from '../../util/docker/DockerRunnerImpl';
 import { Commander } from '../../util/commander';
 import { BASE_APP_DATA_PATH } from '../../util/application/path';
+import { ipcMain } from 'electron';
 
 /**
  * A Database Playground manager
@@ -22,7 +23,7 @@ export class PlayGroundManger {
         const docker = new DockerCLI(command);
         const mysql = new MYSQLDocker(docker, BASE_APP_DATA_PATH);
         const dbProces: Map<DBType, IDBProcess> = new Map();
-        dbProces.set('MYSQL', mysql);
+        dbProces.set('mysql', mysql);
         return new PlayGroundManger(dbProces);
     }
     /**
@@ -40,8 +41,9 @@ export class PlayGroundManger {
     }
     private handleOut([out, err]: DBProcTpl, type: DBType): DBProcTpl {
         if (!err) {
+            console.log(ipcMain);
             // setup shutdown listener
-            pubsub.addListener(
+            ipcMain.on(
                 SHUTDOWN_SERVICE_EV,
                 this.onProcessCreate(type, out.ProcessID)
             );

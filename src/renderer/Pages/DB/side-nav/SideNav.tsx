@@ -17,6 +17,10 @@ import TextField from '@mui/material/TextField';
 import { search } from 'fast-fuzzy';
 import CustomDrawer from 'renderer/Components/CustomDrawer/CustomDrawer';
 import { DBSelect } from '../select-db/SelectDB';
+import { Tabs, Tab } from '@mui/material';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import SchemaIcon from '@mui/icons-material/Schema';
+import InfoIcon from '@mui/icons-material/Info';
 
 const drawerWidth = 250;
 export type TableNav = {
@@ -26,6 +30,7 @@ export type TableNav = {
 export type SideNavProps = {
     tables: TableNav[];
     children: React.ReactNode;
+    dbName?: string;
 };
 export default function SideNav(s: SideNavProps) {
     let { tables } = s;
@@ -34,6 +39,10 @@ export default function SideNav(s: SideNavProps) {
     }
     tables = tables.sort((a, b) => a.Name.localeCompare(b.Name));
     const [tbls, setTables] = React.useState(s.tables);
+    const [viewIndex, setViewIndex] = React.useState(0);
+    const onChangeIndex = (event: React.SyntheticEvent, newValue: number) => {
+        setViewIndex(newValue);
+    };
     const filterTableVal = (val: string) => {
         if (val == '') {
             setTables(tables);
@@ -58,6 +67,40 @@ export default function SideNav(s: SideNavProps) {
                         selectedDB={'main_db'}
                         dbs={['main_db', 'second_db']}
                     ></DBSelect>
+
+                    <Box sx={{ width: '100%', textAlign: 'center' }}>
+                        <Typography variant="caption">
+                            (MYSQL v5.7) php-dev
+                        </Typography>
+                        <Tabs
+                            value={viewIndex}
+                            onChange={onChangeIndex}
+                            centered
+                        >
+                            <Tab
+                                icon={<TableViewIcon htmlColor="#B99100" />}
+                                label="Content"
+                                sx={{ textTransform: 'none' }}
+                            />
+                            <Tab
+                                icon={<SchemaIcon htmlColor="#B99100" />}
+                                label="Structure"
+                                sx={{ textTransform: 'none' }}
+                            />
+                            <Tab
+                                icon={
+                                    <InsertDriveFileIcon htmlColor="#bf360c" />
+                                }
+                                label="Query"
+                                sx={{ textTransform: 'none' }}
+                            />
+                            <Tab
+                                icon={<InfoIcon color="primary" />}
+                                label="Table info"
+                                sx={{ textTransform: 'none' }}
+                            />
+                        </Tabs>
+                    </Box>
                 </Toolbar>
             </AppBar>
 
@@ -121,10 +164,11 @@ export default function SideNav(s: SideNavProps) {
             </CustomDrawer>
             <div
                 style={{
+                    marginTop: '32px',
                     marginLeft: '240px',
                     display: 'flex',
                     justifyContent: 'center',
-                    height: 'calc(100vh - 65px)',
+                    height: 'calc(100vh - 96px)',
 
                     width: 'calc(100vw - 200px)',
                 }}

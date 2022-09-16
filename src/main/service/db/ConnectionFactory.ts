@@ -2,7 +2,7 @@ import { ErrorTuple } from '../../util/tuple';
 import { Sequelize } from 'sequelize';
 import { DBType } from '../../model/Connections';
 
-const CONNECTION_TRY_BEFORE_TIMEOUT_SECONDS = 20 * 1000;
+const CONNECTION_TRY_BEFORE_TIMEOUT_SECONDS = 60 * 1000;
 
 const waitTillConnection = async (con: Sequelize): Promise<Error> => {
     let msElapsed = 0;
@@ -11,16 +11,23 @@ const waitTillConnection = async (con: Sequelize): Promise<Error> => {
             // every second try for connection
             if (msElapsed >= CONNECTION_TRY_BEFORE_TIMEOUT_SECONDS) {
                 clearInterval(itvl);
+                console.log('connection_factory', 'timed out :(');
                 res(new Error(`Connection retry has exceeded timeout`));
             }
             await con
                 .query('select 1')
                 .then((data) => {
-                    console.log('got connection !', data);
+                    console.log('connection_factory', 'got connection !', data);
                     clearInterval(itvl);
                     res(null);
                 })
                 .catch(() => {
+                    console.log(
+                        'connection_factory',
+                        'retrying ...',
+                        msElapsed / 1000,
+                        's'
+                    );
                     msElapsed += 1000;
                 });
         }, 1000);
@@ -41,7 +48,7 @@ export const CreateConnection = async (
     let host = opts.get('host');
     host = host ? host : '127.0.0.1';
     switch (type) {
-        case 'MYSQL':
+        case 'mysql':
             connectionString = `mysql://${opts.get('user_name')}:${opts.get(
                 'password'
             )}@${host}:${opts.get('port')}/${opts.get('default_db')}`;
@@ -52,9 +59,8 @@ export const CreateConnection = async (
                 new Error('Unsupported Database Type'),
             ]);
     }
-    console.log(connectionString);
     const con = new Sequelize(connectionString);
-
+    console.log('connection factory', 'waiting till conneciton');
     let err = await waitTillConnection(con);
     return err ? [null, err] : [con, null];
 };

@@ -1,7 +1,9 @@
+import { Box, Tab, Tabs } from '@mui/material';
+import React from 'react';
 import DataTable from './main-table/MainTable';
 import SideNav from './side-nav/SideNav';
 
-export function TablePage() {
+export function DBView() {
     return (
         <div>
             <SideNav
@@ -17,9 +19,7 @@ export function TablePage() {
                     { Name: 'user_guides', Type: 'table' },
                     { Name: 'read_mes', Type: 'table' },
                 ]}
-            >
-                <DataTable></DataTable>
-            </SideNav>
+            ></SideNav>
         </div>
     );
 }
