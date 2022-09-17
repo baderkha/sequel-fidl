@@ -4,22 +4,10 @@
 export class Event<T> {
     Data: T;
     CreatedAt: Date;
-    RespondTo: string;
-    ErrorTo: string;
     constructor() {}
 
     WithData(d: T): this {
         this.Data = d;
-        return this;
-    }
-
-    WithRespondTo(resTo: string): this {
-        this.RespondTo = resTo;
-        return this;
-    }
-
-    WithErrorTo(errTo: string): this {
-        this.ErrorTo = errTo;
         return this;
     }
 

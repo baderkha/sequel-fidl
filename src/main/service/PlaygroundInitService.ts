@@ -8,7 +8,7 @@ import {
 import { CreateConnection } from './db/ConnectionFactory';
 import { ConManager } from './Connections';
 import { PlayGroundManger } from './db/PlaygroundManager';
-import { DBInitService } from './DbService';
+import { DBInitService } from './DBInitService';
 import { Make } from '../util/object';
 import { LiveConnection } from '../model/LiveConnection';
 import { ILiveConnectionRepo } from '../repository/LiveConnection';
@@ -35,10 +35,10 @@ export type DatabaseSupported = Map<DBType, Array<string>>;
  * @author Ahmad Baderkhan
  * @version 1
  */
-export class PlaygroundService extends DBInitService {
+export class PlaygroundInitService extends DBInitService {
     private pgroundMgr: PlayGroundManger;
     private repo: IPlaygroundConnectionRepo;
-    private static _instance: PlaygroundService;
+    private static _instance: PlaygroundInitService;
 
     constructor(
         mgr: ConManager,
@@ -51,8 +51,8 @@ export class PlaygroundService extends DBInitService {
         this.repo = repo;
     }
 
-    public static Default(): PlaygroundService {
-        if (!PlaygroundService._instance) {
+    public static Default(): PlaygroundInitService {
+        if (!PlaygroundInitService._instance) {
             const db = GetPersistentDBConnection();
             const dbMem = GetMemDBSqlConnection();
             const liveConRepo = new LiveConnectionSQLiteRepo(
@@ -63,14 +63,14 @@ export class PlaygroundService extends DBInitService {
                 new PlaygroundConnection(),
                 db
             );
-            PlaygroundService._instance = new PlaygroundService(
+            PlaygroundInitService._instance = new PlaygroundInitService(
                 ConManager.GetInstance(),
                 liveConRepo,
                 playGroundRepo,
                 PlayGroundManger.Default()
             );
         }
-        return PlaygroundService._instance;
+        return PlaygroundInitService._instance;
     }
 
     async newPlayground(

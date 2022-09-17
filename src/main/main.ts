@@ -15,6 +15,7 @@ import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 import { SHUTDOWN_SERVICE_EV } from './util/pubsub';
+import { InitEventListeners } from './controller/event/init';
 
 class AppUpdater {
     constructor() {
@@ -134,6 +135,11 @@ app.on('before-quit', () => {
 ipcMain.on('app_quit', () => {
     ipcMain.emit(SHUTDOWN_SERVICE_EV);
 });
+
+/**
+ * Event Listeners
+ */
+InitEventListeners();
 
 app.whenReady()
     .then(() => {

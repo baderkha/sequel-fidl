@@ -4,7 +4,7 @@ import { LiveConnectionSQLiteRepo } from './repository/LiveConnectionSQLite';
 import { PlaygroudConnectionsRepoSQLite } from './repository/PlaygroundConnection';
 import { ConManager } from './service/Connections';
 import { PlayGroundManger } from './service/db/PlaygroundManager';
-import { PlaygroundService } from './service/PlaygroundService';
+import { PlaygroundInitService } from './service/PlaygroundInitService';
 import { Sequelize } from 'sequelize';
 import { migrate } from './util/store/model';
 import { SHUTDOWN_SERVICE_EV } from './util/pubsub';
@@ -21,7 +21,7 @@ const main = async () => {
     await migrate(LiveConnection, db);
     await migrate(PlaygroundConnection, db);
 
-    const ser = new PlaygroundService(
+    const ser = new PlaygroundInitService(
         ConManager.GetInstance(),
         liveConRepo,
         playGroundRepo,

@@ -44,8 +44,8 @@ export class ConManager {
      * @param dbLive
      * @param onFail on connection failure
      */
-    Add(dbLive: Sequelize): string {
-        const connectionId = v4();
+    Add(dbLive: Sequelize, connectionIdOverride?: string): string {
+        const connectionId = connectionIdOverride ? connectionIdOverride : v4();
         const timerId = global.setInterval(async () => {
             const isAlive = await dbLive
                 .query('SELECT 1')

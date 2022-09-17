@@ -4,7 +4,7 @@ import { DBType } from '../../model/Connections';
 
 const CONNECTION_TRY_BEFORE_TIMEOUT_SECONDS = 60 * 1000;
 
-const waitTillConnection = async (con: Sequelize): Promise<Error> => {
+export const waitTillConnection = async (con: Sequelize): Promise<Error> => {
     let msElapsed = 0;
     return new Promise((res) => {
         let itvl = setInterval(async () => {

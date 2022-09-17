@@ -1,13 +1,8 @@
+import { Dialect } from 'sequelize';
 import { DataTypes } from 'sequelize';
 import { SqlizeModelIndexed } from '../util/store/model/SequelizeModelIndexed';
 
-export type DBType =
-    | 'mariadb'
-    | 'mssql'
-    | 'mysql'
-    | 'oracle'
-    | 'postgres'
-    | 'sqlite';
+export type DBType = Dialect;
 
 /**
  * Connection Config

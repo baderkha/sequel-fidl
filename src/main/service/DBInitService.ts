@@ -1,4 +1,3 @@
-import { ErrorTuple, NewTuple } from '../util/tuple';
 import { LiveConnection } from '../model/LiveConnection';
 import { ILiveConnectionRepo } from '../repository/LiveConnection';
 import { ConManager } from './Connections';

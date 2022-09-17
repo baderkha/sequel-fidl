@@ -45,7 +45,6 @@ export type Filter = {
 };
 
 export type SelectInput = {
-    con: Sequelize;
     tableName: string;
     limit: number;
     offset: number;
@@ -93,7 +92,7 @@ export abstract class AdminSQLCommand {
             .catch((err) => err);
     }
 
-    SelectFromTable(s: SelectInput): Promise<any[]> {
+    SelectFromTable(con: Sequelize, s: SelectInput): Promise<any[]> {
         s.limit = s.limit ? s.limit : 20;
         s.offset = s.offset ? s.offset : 0;
 
@@ -110,14 +109,16 @@ export abstract class AdminSQLCommand {
 
             filter = ` AND ${filters.join(' AND ')} `;
         }
-        return s.con.query(
-            `SELECT * FROM ${s.tableName} WHERE 1=1 ${filter} ${
-                s.orderByCol ? 'ORDER BY ' + s.orderByCol : ''
-            }LIMIT ${s.limit} OFFSET ${s.offset}`,
-            {
-                replacements: args,
-                type: QueryTypes.SELECT,
-            }
-        );
+        return con
+            .query(
+                `SELECT * FROM ${s.tableName} WHERE 1=1 ${filter} ${
+                    s.orderByCol ? 'ORDER BY ' + s.orderByCol : ''
+                }LIMIT ${s.limit} OFFSET ${s.offset}`,
+                {
+                    replacements: args,
+                    type: QueryTypes.SELECT,
+                }
+            )
+            .catch(() => []);
     }
 }
