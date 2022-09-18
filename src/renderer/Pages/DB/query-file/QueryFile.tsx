@@ -6,6 +6,7 @@ import {
     Divider,
     Snackbar,
     Alert,
+    Tooltip,
 } from '@mui/material';
 import React, { useEffect } from 'react';
 import Editor from 'react-simple-code-editor';
@@ -52,6 +53,7 @@ export const QueryFile = () => {
                     fontSize: 14,
                     height: 'calc(50% - 41px)',
                     width: '100%',
+                    overflowY: 'scroll',
                 }}
                 onFocus={(el) => {
                     el.target.style.outline = 'none';
@@ -83,40 +85,42 @@ export const QueryFile = () => {
                 >
                     Beautify
                 </Button>
-                <Button
-                    variant="outlined"
-                    onClick={() => {
-                        const sel = selection;
+                <Tooltip title={selection}>
+                    <Button
+                        variant="outlined"
+                        onClick={() => {
+                            const sel = selection;
 
-                        window.electron.ipcRenderer
-                            .invokeAs<ErrorTuple<any[]>>(
-                                'run_manual_query',
-                                new RunManualQueryEvent().WithData({
-                                    conID,
-                                    query: sel,
-                                })
-                            )
-                            .then((res) => {
-                                setSelection('');
-                                const [data, err] = res;
-                                if (err != null) {
-                                    setErrMsg(err.message);
-                                } else {
-                                    setTableRows(data);
-                                }
-                            });
-                    }}
-                    endIcon={<PlayArrowIcon />}
-                    size="small"
-                    sx={{
-                        marginRight: '5px',
-                        textTransform: 'none',
-                        borderRadius: '0',
-                    }}
-                    disabled={!selection}
-                >
-                    Run Selection
-                </Button>
+                            window.electron.ipcRenderer
+                                .invokeAs<ErrorTuple<any[]>>(
+                                    'run_manual_query',
+                                    new RunManualQueryEvent().WithData({
+                                        conID,
+                                        query: sel,
+                                    })
+                                )
+                                .then((res) => {
+                                    setSelection('');
+                                    const [data, err] = res;
+                                    if (err != null) {
+                                        setErrMsg(err.message);
+                                    } else {
+                                        setTableRows(data);
+                                    }
+                                });
+                        }}
+                        endIcon={<PlayArrowIcon />}
+                        size="small"
+                        sx={{
+                            marginRight: '5px',
+                            textTransform: 'none',
+                            borderRadius: '0',
+                        }}
+                        disabled={!selection}
+                    >
+                        Run Selection
+                    </Button>
+                </Tooltip>
             </div>
             <MainTable
                 sx={{
