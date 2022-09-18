@@ -1,6 +1,8 @@
 import * as React from 'react';
 import { DataGrid, GridColDef, GridValueGetterParams } from '@mui/x-data-grid';
 import { v4 } from 'uuid';
+import { SxProps } from '@mui/material';
+import { Theme } from '@chakra-ui/react';
 
 export type DataTableSchema = {
     cols: GridColDef[];
@@ -15,11 +17,13 @@ export type DataTableProps = {
     onPageChange?: (pageNumber: number) => void;
     rowCount?: number;
     maxRowPerPage?: number;
+    sx?: SxProps<Theme>;
 };
 
-export default function DataTable(props: DataTableProps) {
+export function MainTable(props: DataTableProps) {
     return (
         <DataGrid
+            sx={props.sx}
             editMode="row"
             onPageChange={(pageNumber: number) =>
                 props.onPageChange && props.onPageChange(pageNumber)

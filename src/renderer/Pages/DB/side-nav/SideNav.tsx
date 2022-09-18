@@ -17,10 +17,11 @@ import TextField from '@mui/material/TextField';
 import { search } from 'fast-fuzzy';
 import CustomDrawer from 'renderer/Components/CustomDrawer/CustomDrawer';
 import { DBSelect } from '../select-db/SelectDB';
-import { Tabs, Tab } from '@mui/material';
+import { Tabs, Tab, IconButton } from '@mui/material';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import SchemaIcon from '@mui/icons-material/Schema';
 import InfoIcon from '@mui/icons-material/Info';
+import AddIcon from '@mui/icons-material/Add';
 
 const drawerWidth = 250;
 export type TableNav = {
@@ -37,20 +38,29 @@ export default function SideNav(s: SideNavProps) {
     if (!tables) {
         tables = new Array();
     }
+
     tables = tables.sort((a, b) => a.Name.localeCompare(b.Name));
-    const [tbls, setTables] = React.useState(s.tables);
+    const [tbls, setTables] = React.useState([]);
+    const [searchTerm, setSearchTerm] = React.useState('');
     const [viewIndex, setViewIndex] = React.useState(0);
     const onChangeIndex = (event: React.SyntheticEvent, newValue: number) => {
         setViewIndex(newValue);
     };
+    React.useEffect(() => {
+        setTables(tables);
+        filterTableVal(searchTerm);
+    }, [tables]);
     const filterTableVal = (val: string) => {
+        setSearchTerm(val);
         if (val == '') {
             setTables(tables);
             return;
         }
         const res = search(val, tables, { keySelector: (obj) => obj.Name });
+
         setTables(res);
     };
+    console.log('state var ', tbls);
     return (
         <Box sx={{ display: 'flex' }}>
             <CssBaseline />
@@ -133,18 +143,29 @@ export default function SideNav(s: SideNavProps) {
                 </div>
                 <Divider />
 
-                <Typography
-                    variant="subtitle1"
-                    style={{ marginLeft: '4px' }}
-                    sx={{
-                        color: '#808081',
-                        fontWeight: 'bold',
-                        marginTop: '5px',
-                        userSelect: 'none',
+                <div
+                    style={{
+                        width: '100%',
+                        display: 'flex',
+                        justifyContent: 'space-between',
                     }}
                 >
-                    Tables
-                </Typography>
+                    <Typography
+                        variant="subtitle1"
+                        style={{ marginLeft: '4px' }}
+                        sx={{
+                            color: '#808081',
+                            fontWeight: 'bold',
+                            marginTop: '5px',
+                            userSelect: 'none',
+                        }}
+                    >
+                        Tables
+                    </Typography>
+                    <IconButton>
+                        <AddIcon />
+                    </IconButton>
+                </div>
                 <List>
                     {tbls.map(({ Name, Type }, index) => (
                         <ListItem key={Name} disablePadding>

@@ -136,12 +136,8 @@ ipcMain.on('app_quit', () => {
     ipcMain.emit(SHUTDOWN_SERVICE_EV);
 });
 
-/**
- * Event Listeners
- */
-InitEventListeners();
-
 app.whenReady()
+    .then(() => InitEventListeners())
     .then(() => {
         createWindow();
         app.on('activate', () => {

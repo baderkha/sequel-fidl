@@ -10,7 +10,8 @@ import {
 } from '../util/sql_admin_commands';
 import { ConManager } from './Connections';
 import { waitTillConnection } from './db/ConnectionFactory';
-import { MYSQLAdminCommand } from 'main/util/sql_admin_commands/MYSQLAdminCommand';
+import { MYSQLAdminCommand } from '../util/sql_admin_commands/MYSQLAdminCommand';
+import { ErrorTuple, NewErrorTuple } from '../util/tuple';
 export type DialectInfoRes = {
     Dialect?: string;
     Version?: string;
@@ -65,15 +66,17 @@ export class SQLService {
      * @param conID
      * @param query
      */
-    RunManualQuery(conID: string, query: string): Promise<any[]> {
+    RunManualQuery(conID: string, query: string): Promise<ErrorTuple<any[]>> {
         const [_, con] = this.conMgr.GetConById(conID);
         if (!con) {
-            return Promise.resolve([]);
+            return Promise.resolve(
+                NewErrorTuple([], new Error('no valid connection !'))
+            );
         }
         return con
             .query(query)
-            .then((data) => data[0])
-            .catch(() => []);
+            .then((data) => NewErrorTuple(data[0], null))
+            .catch((err) => NewErrorTuple([], err));
     }
     /**
      * Get a list of tables + views
