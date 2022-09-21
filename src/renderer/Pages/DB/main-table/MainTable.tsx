@@ -18,6 +18,7 @@ export type DataTableProps = {
     rowCount?: number;
     maxRowPerPage?: number;
     sx?: SxProps<Theme>;
+    disableCheckBox?: boolean;
 };
 
 export function MainTable(props: DataTableProps) {
@@ -35,7 +36,7 @@ export function MainTable(props: DataTableProps) {
             isCellEditable={() => true}
             experimentalFeatures={{ newEditingApi: true }}
             rowsPerPageOptions={[5]}
-            checkboxSelection
+            checkboxSelection={!props.disableCheckBox}
             getRowId={(row: any) => {
                 if (props.Schema && props.Schema.primaryKey) {
                     return row[props.Schema.primaryKey];

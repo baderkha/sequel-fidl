@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+        <title>Editor</title>
+        <style type="text/css" media="screen">
+            body {
+                overflow: hidden;
+            }
+
+            #editor {
+                margin: 0;
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                right: 0;
+            }
+        </style>
+    </head>
+    <body>
+        <pre id="editor"></pre>
+
+        <script
+            src="src-noconflict/ace.js"
+            type="text/javascript"
+            charset="utf-8"
+        ></script>
+        <script src="src-noconflict/ext-language_tools.js"></script>
+
+        <script>
+            let selection = '';
+            ace.require('ace/ext/language_tools');
+            var editor = ace.edit('editor');
+            editor.setTheme('ace/theme/chrome');
+            editor.setOptions({
+                enableBasicAutocompletion: true,
+                enableSnippets: true,
+                enableLiveAutocompletion: true,
+            });
+            editor.session.setMode('ace/mode/mysql');
+            editor.session.on('change', (ev) => {
+                window.parent.postMessage(
+                    JSON.stringify({
+                        type: 'setCode',
+                        data: editor.session.getValue(),
+                    }),
+                    '*'
+                );
+            });
+            window.setInterval(() => {
+                const sel = editor.getSelectedText();
+
+                if (selection != sel) {
+                    selection = sel;
+                    window.parent.postMessage(
+                        JSON.stringify({
+                            type: 'setSelection',
+                            data: selection,
+                        }),
+                        '*'
+                    );
+                }
+            }, 50);
+            window.parent.postMessage('hello');
+            window.addEventListener('message', function (e) {
+                const ev = JSON.parse(e.data);
+                switch (ev.type) {
+                    case 'setCompleters': {
+                        editor.completers.push({
+                            getCompletions: function (
+                                editor,
+                                session,
+                                pos,
+                                prefix,
+                                callback
+                            ) {
+                                callback(null, ev.data);
+                            },
+                        });
+                    }
+                    case 'getCode': {
+                        const code = editor.session.getValue();
+                        ev.source.postMessage(code, '*');
+                    }
+                    case 'setCode': {
+                        editor.session.setValue(ev.data);
+                    }
+                }
+            });
+        </script>
+    </body>
+</html>

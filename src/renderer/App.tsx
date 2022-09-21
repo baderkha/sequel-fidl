@@ -1,6 +1,7 @@
 import { useAtom } from 'jotai';
 import { useEffect } from 'react';
 import { MemoryRouter as Router, Routes, Route } from 'react-router-dom';
+import { CodeEditorIFRAME } from './Components/CodeEditor/CodeEditor';
 import { DBView } from './Pages/DB/DB';
 import { DummyConID } from './State';
 
@@ -26,6 +27,7 @@ export default function App() {
             <Routes>
                 <Route path="/" element={<Hello />} />
             </Routes>
+            <Routes></Routes>
         </Router>
     );
 }

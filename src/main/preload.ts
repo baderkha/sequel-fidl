@@ -26,4 +26,5 @@ contextBridge.exposeInMainWorld('electron', {
             return ipcRenderer.invoke(channel, arg);
         },
     },
+    __dirname: __dirname,
 });

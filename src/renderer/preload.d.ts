@@ -13,6 +13,7 @@ declare global {
                 invoke(channel: string, arg: unknown): Promise<any>;
                 invokeAs<T>(channel: string, arg: any): Promise<T>;
             };
+            __dirname: string;
         };
     }
 }

@@ -62,7 +62,7 @@ export default function SideNav(s: SideNavProps) {
     };
     console.log('state var ', tbls);
     return (
-        <Box sx={{ display: 'flex' }}>
+        <div style={{ display: 'flex' }}>
             <CssBaseline />
             <AppBar
                 position="fixed"
@@ -78,7 +78,7 @@ export default function SideNav(s: SideNavProps) {
                         dbs={['main_db', 'second_db']}
                     ></DBSelect>
 
-                    <Box sx={{ width: '100%', textAlign: 'center' }}>
+                    <div style={{ width: '100%', textAlign: 'center' }}>
                         <Typography variant="caption">
                             (MYSQL v5.7) php-dev
                         </Typography>
@@ -110,7 +110,7 @@ export default function SideNav(s: SideNavProps) {
                                 sx={{ textTransform: 'none' }}
                             />
                         </Tabs>
-                    </Box>
+                    </div>
                 </Toolbar>
             </AppBar>
 
@@ -183,31 +183,6 @@ export default function SideNav(s: SideNavProps) {
                     ))}
                 </List>
             </CustomDrawer>
-            <div
-                style={{
-                    marginTop: '32px',
-                    marginLeft: '240px',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    height: 'calc(100vh - 96px)',
-
-                    width: 'calc(100vw - 200px)',
-                }}
-            >
-                <Box
-                    component="main"
-                    sx={{
-                        flexGrow: 1,
-                        bgcolor: 'background.default',
-                        height: '100%',
-                        width: '100%',
-                    }}
-                >
-                    <Toolbar />
-
-                    {s.children}
-                </Box>
-            </div>
-        </Box>
+        </div>
     );
 }

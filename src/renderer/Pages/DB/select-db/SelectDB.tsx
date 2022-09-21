@@ -12,7 +12,7 @@ export type DBSelectProps = {
 
 export function DBSelect(props: DBSelectProps) {
     return (
-        <Box sx={{ minWidth: 200 }}>
+        <div style={{ minWidth: 200 }}>
             <FormControl fullWidth>
                 <InputLabel id="demo-multiple-name-label">DB</InputLabel>
                 <Select
@@ -29,6 +29,6 @@ export function DBSelect(props: DBSelectProps) {
                         : undefined}
                 </Select>
             </FormControl>
-        </Box>
+        </div>
     );
 }
