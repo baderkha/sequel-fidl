@@ -5,6 +5,7 @@ import {
     Button,
     Tooltip,
     Snackbar,
+    ButtonGroup,
     Tooltip,
     Alert,
     Divider,
@@ -111,6 +112,32 @@ export const CodeEditorIFRAME = (props: CodeEditorProps) => {
                 >
                     Beautify
                 </Button>
+                <ButtonGroup variant="outlined">
+                    <Button
+                        id="beautify-btn"
+                        onClick={formatCode}
+                        size="small"
+                        sx={{
+                            marginLeft: '5px',
+                            textTransform: 'none',
+                            borderRadius: '0',
+                        }}
+                    >
+                        Export AS CSV
+                    </Button>
+                    <Button
+                        id="beautify-btn"
+                        onClick={formatCode}
+                        size="small"
+                        sx={{
+                            textTransform: 'none',
+                            borderRadius: '0',
+                        }}
+                    >
+                        {' '}
+                        JSON
+                    </Button>
+                </ButtonGroup>
                 <Tooltip
                     title={`query selected : \n${selection}`}
                     hidden={!selection}
