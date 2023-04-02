@@ -22,6 +22,7 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import SchemaIcon from '@mui/icons-material/Schema';
 import InfoIcon from '@mui/icons-material/Info';
 import AddIcon from '@mui/icons-material/Add';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 const drawerWidth = 250;
 export type TableNav = {
@@ -30,6 +31,10 @@ export type TableNav = {
 };
 export type SideNavProps = {
     tables: TableNav[];
+    onTableSelected: (tableName: string) => void;
+    onViewIndexChange: (index: number) => void;
+    onRefreshClicked: () => void;
+    viewIndexOverride: number;
     children: React.ReactNode;
     dbName?: string;
 };
@@ -45,11 +50,12 @@ export default function SideNav(s: SideNavProps) {
     const [viewIndex, setViewIndex] = React.useState(0);
     const onChangeIndex = (event: React.SyntheticEvent, newValue: number) => {
         setViewIndex(newValue);
+        s.onViewIndexChange && s.onViewIndexChange(newValue);
     };
     React.useEffect(() => {
         setTables(tables);
         filterTableVal(searchTerm);
-    }, [tables]);
+    }, [tables, viewIndex]);
     const filterTableVal = (val: string) => {
         setSearchTerm(val);
         if (val == '') {
@@ -162,13 +168,26 @@ export default function SideNav(s: SideNavProps) {
                     >
                         Tables
                     </Typography>
-                    <IconButton>
-                        <AddIcon />
-                    </IconButton>
+                    <div>
+                        <IconButton>
+                            <AddIcon />
+                        </IconButton>
+                        <IconButton>
+                            <RefreshIcon onClick={s.onRefreshClicked} />
+                        </IconButton>
+                    </div>
                 </div>
                 <List>
                     {tbls.map(({ Name, Type }, index) => (
-                        <ListItem key={Name} disablePadding>
+                        <ListItem
+                            key={Name}
+                            disablePadding
+                            onClick={() => {
+                                if (Type == 'table') {
+                                    s.onTableSelected(Name);
+                                }
+                            }}
+                        >
                             <ListItemButton>
                                 <ListItemIcon>
                                     {Type == 'table' ? (

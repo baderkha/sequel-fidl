@@ -96,7 +96,7 @@ export abstract class AdminSQLCommand {
         s.limit = s.limit ? s.limit : 20;
         s.offset = s.offset ? s.offset : 0;
 
-        let filter: string;
+        let filter: string = '';
         let args: any[] = [];
         if (s.extraFilters && s.extraFilters.length > 0) {
             let filters = s.extraFilters.map((filter) => {

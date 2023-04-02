@@ -24,6 +24,7 @@ export const QueryFile = () => {
     const [html, setHTML] = React.useState('');
     const [selection, setSelection] = React.useState('');
     const [errMsg, setErrMsg] = React.useState('');
+    const [successMsg, setSuccessMsg] = React.useState('');
 
     const [tableRows, setTableRows] = React.useState([]);
     console.log('render');
@@ -71,6 +72,7 @@ export const QueryFile = () => {
                                     setTableRows([]);
                                     return;
                                 }
+                                setSuccessMsg('executed query !');
                                 setTableRows(res);
                             });
                     }}
@@ -86,6 +88,7 @@ export const QueryFile = () => {
                     paddingTop: '0px',
                     height: '50%',
                     borderRadius: '0',
+                    borderBottom: 'none',
                 }}
                 Data={tableRows}
                 Schema={generateSchemaFromTableRows(tableRows)}
@@ -96,6 +99,13 @@ export const QueryFile = () => {
                 onClose={() => setErrMsg('')}
             >
                 <Alert severity="error">{errMsg}</Alert>
+            </Snackbar>
+            <Snackbar
+                open={!!successMsg}
+                autoHideDuration={6000}
+                onClose={() => setSuccessMsg('')}
+            >
+                <Alert severity="success">{successMsg}</Alert>
             </Snackbar>
         </div>
     );
