@@ -47,15 +47,16 @@ export default function SideNav(s: SideNavProps) {
     tables = tables.sort((a, b) => a.Name.localeCompare(b.Name));
     const [tbls, setTables] = React.useState([]);
     const [searchTerm, setSearchTerm] = React.useState('');
-    const [viewIndex, setViewIndex] = React.useState(0);
+    const [viewIndex, setViewIndex] = React.useState(s.viewIndexOverride);
     const onChangeIndex = (event: React.SyntheticEvent, newValue: number) => {
         setViewIndex(newValue);
         s.onViewIndexChange && s.onViewIndexChange(newValue);
     };
     React.useEffect(() => {
+        console.log('use effects');
         setTables(tables);
         filterTableVal(searchTerm);
-    }, [tables, viewIndex]);
+    }, [viewIndex, tables]);
     const filterTableVal = (val: string) => {
         setSearchTerm(val);
         if (val == '') {

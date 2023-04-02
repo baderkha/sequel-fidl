@@ -51,6 +51,7 @@ export function DBView() {
                 tables={tables}
                 onTableSelected={onTableSelected}
                 onViewIndexChange={onTabViewIndexChange}
+                viewIndexOverride={tabViewIdx}
                 onRefreshClicked={onRefreshTablesClicked}
             ></SideNav>
             <div
