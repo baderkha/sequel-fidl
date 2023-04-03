@@ -51,7 +51,9 @@ export const CreateConnection = async (
         case 'mysql':
             connectionString = `mysql://${opts.get('user_name')}:${opts.get(
                 'password'
-            )}@${host}:${opts.get('port')}/${opts.get('default_db')}`;
+            )}@${host}:${opts.get('port')}/${opts.get(
+                'default_db'
+            )}?multipleStatements=true`;
             break;
         default:
             return Promise.resolve([

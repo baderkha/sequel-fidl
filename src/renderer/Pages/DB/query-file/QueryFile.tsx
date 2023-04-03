@@ -9,13 +9,29 @@ import {
 } from '@mui/material';
 import React, { useEffect } from 'react';
 import { MainTable } from '../main-table/MainTable';
-
 import { useAtom } from 'jotai';
 import { DummyConID } from 'renderer/State';
 import { RunManualQueryEvent } from 'main/controller/event/SQLEventController';
 import { ErrorTuple } from 'main/util/tuple';
 import { GridColDef } from '@mui/x-data-grid';
 import { CodeEditorIFRAME } from 'renderer/Components/CodeEditor/CodeEditor';
+import { generateSchemaFromTableRows } from 'renderer/util/GenerateSchemaFromTableRows';
+import { Parser } from '@json2csv/plainjs';
+
+const saveFile =
+    (content: any, isJSON = false) =>
+    async () => {
+        if (typeof (content?.then === 'function')) {
+            content = await content;
+        }
+        const element = document.createElement('a');
+        const file = new Blob([content], {
+            type: 'text/plain',
+        });
+        element.href = URL.createObjectURL(file);
+        element.download = `file.${isJSON ? 'json' : 'csv'}`;
+        element.click();
+    };
 
 export const QueryFile = () => {
     const [conID] = useAtom(DummyConID);
@@ -36,22 +52,6 @@ export const QueryFile = () => {
         };
     }, [conID]);
 
-    const generateSchemaFromTableRows = (rows: any[]): DataTableSchema => {
-        if (!(rows && rows.length > 0)) {
-            return null;
-        }
-        const defs = Object.keys(rows[0]).map((key): GridColDef => {
-            return {
-                field: key,
-                headerName: key,
-            };
-        });
-
-        return {
-            cols: defs,
-            primaryKey: '',
-        };
-    };
     return (
         <div style={{ width: '100%', height: '100%' }}>
             <div style={{ width: '100%', height: '55.5%' }}>
@@ -78,6 +78,15 @@ export const QueryFile = () => {
                     }}
                     tables={[]}
                     columns={[]}
+                    onSaveJSON={saveFile(
+                        JSON.stringify(tableRows, null, 4),
+                        true
+                    )}
+                    onSaveCSV={saveFile(
+                        tableRows.length > 0
+                            ? new Parser().parse(tableRows)
+                            : ''
+                    )}
                 />
             </div>
 

@@ -111,11 +111,6 @@ export default function SideNav(s: SideNavProps) {
                                 label="Query"
                                 sx={{ textTransform: 'none' }}
                             />
-                            <Tab
-                                icon={<InfoIcon color="primary" />}
-                                label="Table info"
-                                sx={{ textTransform: 'none' }}
-                            />
                         </Tabs>
                     </div>
                 </Toolbar>

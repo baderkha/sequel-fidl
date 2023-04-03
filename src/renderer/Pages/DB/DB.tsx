@@ -8,6 +8,7 @@ import SideNav, { TableNav } from './side-nav/SideNav';
 import { Table } from '../../../main/util/sql_admin_commands';
 import { QueryFile } from './query-file/QueryFile';
 import { Content } from './content/Content';
+import { Structure } from './structure/Structure';
 
 export function DBView() {
     const [conID, setConID] = useAtom(DummyConID);
@@ -72,6 +73,12 @@ export function DBView() {
                         case 0:
                             return (
                                 <Content TableName={selectedTable}></Content>
+                            );
+                        case 1:
+                            return (
+                                <Structure
+                                    TableName={selectedTable}
+                                ></Structure>
                             );
                         case 2:
                             return <QueryFile></QueryFile>;

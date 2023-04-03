@@ -1,5 +1,10 @@
 import * as React from 'react';
-import { DataGrid, GridColDef, GridValueGetterParams } from '@mui/x-data-grid';
+import {
+    DataGrid,
+    GridColDef,
+    GridSlotsComponent,
+    GridValueGetterParams,
+} from '@mui/x-data-grid';
 import { v4 } from 'uuid';
 import { SxProps } from '@mui/material';
 import { Theme } from '@chakra-ui/react';
@@ -18,13 +23,15 @@ export type DataTableProps = {
     rowCount?: number;
     maxRowPerPage?: number;
     sx?: SxProps<Theme>;
+    components?: Partial<GridSlotsComponent>;
     disableCheckBox?: boolean;
 };
 
 export function MainTable(props: DataTableProps) {
     return (
         <DataGrid
-            sx={props.sx}
+            components={props.components}
+            sx={{ ...props.sx, overflow: 'auto' }}
             editMode="row"
             onPageChange={(pageNumber: number) =>
                 props.onPageChange && props.onPageChange(pageNumber)

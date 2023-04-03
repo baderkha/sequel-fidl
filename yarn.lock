@@ -2225,6 +2225,27 @@
     "@jridgewell/resolve-uri" "^3.0.3"
     "@jridgewell/sourcemap-codec" "^1.4.10"
 
+"@json2csv/formatters@^6.1.2":
+  version "6.1.2"
+  resolved "https://registry.yarnpkg.com/@json2csv/formatters/-/formatters-6.1.2.tgz#cf5bc34716d6b04e6727bb20629240ddf05f9c1e"
+  integrity sha512-l8i5EdQvHZHrtSgRFEXMkRnIn8CBopT/ecZSIyPKuee9+pm/Sxcb/r/N2jQWARnOQc7uyqQWAtpPpxU7HhZ2tg==
+
+"@json2csv/node@^6.1.2":
+  version "6.1.2"
+  resolved "https://registry.yarnpkg.com/@json2csv/node/-/node-6.1.2.tgz#f7e9c56164b3aa3b072c76714bd4fa0fe0a7471a"
+  integrity sha512-obe0WcHlAjbRSJ5LdCTy0s598vhNMlRLw66lEqtNSqcqtGBM7FwLXw/4roTZjrTaaMlup7XTBrK2zcoW1DkG5Q==
+  dependencies:
+    "@json2csv/plainjs" "^6.1.2"
+
+"@json2csv/plainjs@^6.1.2":
+  version "6.1.2"
+  resolved "https://registry.yarnpkg.com/@json2csv/plainjs/-/plainjs-6.1.2.tgz#c830ca8ac2d32314cd6bf4bc2c9c152f75970dde"
+  integrity sha512-XNcBd6W4G5mlP6ZL13idEx21diQAM5AJgIe78RxRfZctWRppaZrtpiGTzhc/sNv7UM1FpfO/aa5wel4+aQW7MQ==
+  dependencies:
+    "@json2csv/formatters" "^6.1.2"
+    "@streamparser/json" "^0.0.10"
+    lodash.get "^4.4.2"
+
 "@leichtgewicht/ip-codec@^2.0.1":
   version "2.0.3"
   resolved "https://registry.npmjs.org/@leichtgewicht/ip-codec/-/ip-codec-2.0.3.tgz"
@@ -2533,6 +2554,11 @@
   integrity sha512-BPS4ynJW/o92PUR4wgriz2Ud5gpST5vz6GQfMixEDK0Z8ZCUv2M7SkBLykH56T++Xs+8ln9zTGbOvNGIe02/jw==
   dependencies:
     "@sinonjs/commons" "^1.7.0"
+
+"@streamparser/json@^0.0.10":
+  version "0.0.10"
+  resolved "https://registry.yarnpkg.com/@streamparser/json/-/json-0.0.10.tgz#852725c1d4310217636075826cd5664b7b447aee"
+  integrity sha512-juqNFdqqmY/nvsODq1Vba7PWIaqr01VcqICIrxbws97QKSQhQUMml8FqdHLmevwVpqH39H5mVXKFWiWCi1ke0w==
 
 "@supabase/sql-formatter@^4.0.3":
   version "4.0.3"
@@ -8132,6 +8158,11 @@ json-stringify-safe@^5.0.1:
   resolved "https://registry.npmjs.org/json-stringify-safe/-/json-stringify-safe-5.0.1.tgz"
   integrity sha1-Epai1Y/UXxmg9s4B1lcB4sc1tus=
 
+json-to-csv-export@^2.1.1:
+  version "2.1.1"
+  resolved "https://registry.yarnpkg.com/json-to-csv-export/-/json-to-csv-export-2.1.1.tgz#a09dfb7a44f7cc2949f391672dbfe4fadf39be58"
+  integrity sha512-JQLYqGfaJP4dVV0zIxH6RmHOdnJ32Qch3yDxDtWQy8KsOv73SthVRo38ANXckJxl/WUfGYvvtOlVwPURMTWqlA==
+
 json5@^1.0.1:
   version "1.0.1"
   resolved "https://registry.npmjs.org/json5/-/json5-1.0.1.tgz"
@@ -8377,6 +8408,11 @@ lodash.escaperegexp@^4.1.2:
   version "4.1.2"
   resolved "https://registry.npmjs.org/lodash.escaperegexp/-/lodash.escaperegexp-4.1.2.tgz"
   integrity sha1-ZHYsSGGAglGKw99Mz11YhtriA0c=
+
+lodash.get@^4.4.2:
+  version "4.4.2"
+  resolved "https://registry.yarnpkg.com/lodash.get/-/lodash.get-4.4.2.tgz#2d177f652fa31e939b4438d5341499dfa3825e99"
+  integrity sha512-z+Uw/vLuy6gQe8cfaFWD7p0wVv8fJl3mbzXh33RS+0oW2wvUqiRXiQ69gLWSLpgB5/6sU+r6BlQR0MBILadqTQ==
 
 lodash.isequal@^4.5.0:
   version "4.5.0"
@@ -10313,10 +10349,17 @@ runtime-required@^1.1.0:
   resolved "https://registry.npmjs.org/runtime-required/-/runtime-required-1.1.0.tgz"
   integrity sha512-yX97f5E0WfNpcQnfVjap6vzQcvErkYYCx6eTK4siqGEdC8lglwypUFgZVTX7ShvIlgfkC4XGFl9O1KTYcff0pw==
 
-rxjs@*, rxjs@^7.0.0, rxjs@^7.5.5:
+rxjs@^7.0.0, rxjs@^7.5.5:
   version "7.5.6"
   resolved "https://registry.npmjs.org/rxjs/-/rxjs-7.5.6.tgz"
   integrity sha512-dnyv2/YsXhnm461G+R/Pe5bWP41Nm6LBXEYWI6eiFP4fiwx6WRI/CD0zbdVAudd9xwLEF2IDcKXLHit0FYjUzw==
+  dependencies:
+    tslib "^2.1.0"
+
+rxjs@^7.5.2:
+  version "7.8.0"
+  resolved "https://registry.yarnpkg.com/rxjs/-/rxjs-7.8.0.tgz#90a938862a82888ff4c7359811a595e14e1e09a4"
+  integrity sha512-F2+gxDshqmIub1KdvZkaEfGDwLNpPvk9Fs6LD/MyQxNgMds/WH9OdDDXOmxUZpME+iSK3rQCctkL0DYyytUqMg==
   dependencies:
     tslib "^2.1.0"
 

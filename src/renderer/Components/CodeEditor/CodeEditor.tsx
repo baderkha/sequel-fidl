@@ -17,11 +17,14 @@ import useMessage from '@rottitime/react-hook-message-event';
 
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import AutoFixNormalIcon from '@mui/icons-material/AutoFixNormal';
+import csvDownload from 'json-to-csv-export';
 
 export type CodeEditorProps = {
     onRun: (selection: string) => void;
     tables: string[];
     columns: { tableOwner: string; name: string }[];
+    onSaveJSON: () => void;
+    onSaveCSV: () => void;
 };
 
 export const CodeEditorIFRAME = (props: CodeEditorProps) => {
@@ -115,7 +118,7 @@ export const CodeEditorIFRAME = (props: CodeEditorProps) => {
                 <ButtonGroup variant="outlined">
                     <Button
                         id="beautify-btn"
-                        onClick={formatCode}
+                        onClick={props.onSaveCSV}
                         size="small"
                         sx={{
                             marginLeft: '5px',
@@ -127,7 +130,7 @@ export const CodeEditorIFRAME = (props: CodeEditorProps) => {
                     </Button>
                     <Button
                         id="beautify-btn"
-                        onClick={formatCode}
+                        onClick={props.onSaveJSON}
                         size="small"
                         sx={{
                             textTransform: 'none',
