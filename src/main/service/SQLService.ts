@@ -15,6 +15,7 @@ import { ErrorTuple, NewErrorTuple } from '../util/tuple';
 export type DialectInfoRes = {
     Dialect?: string;
     Version?: string;
+    DatabaseName?: string;
 };
 /**
  *
@@ -53,10 +54,12 @@ export class SQLService {
         if (!con) {
             return Promise.resolve({});
         }
+        const dbName = con.getDatabaseName();
         const dialect = con.getDialect();
         const version = await con.databaseVersion();
-
+        con.getQueryInterface();
         return {
+            DatabaseName: dbName,
             Dialect: dialect,
             Version: version,
         };
@@ -134,6 +137,21 @@ export class SQLService {
         return this.rnr(con.getDialect()).GetSupportedTypes();
     }
 
+    TruncateTable(conID: string, tableName: string): Promise<Error> {
+        const [_, con] = this.conMgr.GetConById(conID);
+        if (!con) {
+            return Promise.resolve(new Error('Could not find connection id'));
+        }
+        return this.rnr(con.getDialect()).TruncateTable(con, tableName);
+    }
+    DropTable(conID: string, tableName: string): Promise<Error> {
+        const [_, con] = this.conMgr.GetConById(conID);
+        if (!con) {
+            return Promise.resolve(new Error('Could not find connection id'));
+        }
+        return this.rnr(con.getDialect()).DropTable(con, tableName);
+    }
+
     /**
      * Switches data bases without changing the connection id
      * @param conID
@@ -202,5 +220,47 @@ export class SQLService {
             return null;
         }
         return this.rnr(con.getDialect()).SelectFromTable(con, s);
+    }
+
+    CloneTable(
+        conID: string,
+        oldTableName: string,
+        newTableName: string,
+        mustDuplicateData: boolean = false
+    ): Promise<Error> {
+        const [_, con] = this.conMgr.GetConById(conID);
+        if (!con) {
+            return null;
+        }
+        return this.rnr(con.getDialect()).CloneTable(
+            con,
+            oldTableName,
+            newTableName,
+            mustDuplicateData
+        );
+    }
+
+    ShowDDL(conID: string, tableName: string): Promise<string> {
+        const [_, con] = this.conMgr.GetConById(conID);
+        if (!con) {
+            return null;
+        }
+        return this.rnr(con.getDialect()).ShowCreateSQL(con, tableName);
+    }
+
+    RenameTable(
+        conID: string,
+        oldTableName: string,
+        newTableName: string
+    ): Promise<Error> {
+        const [_, con] = this.conMgr.GetConById(conID);
+        if (!con) {
+            return null;
+        }
+        return this.rnr(con.getDialect()).RenameTable(
+            con,
+            oldTableName,
+            newTableName
+        );
     }
 }

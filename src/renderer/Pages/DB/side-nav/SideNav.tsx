@@ -22,7 +22,18 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import SchemaIcon from '@mui/icons-material/Schema';
 import InfoIcon from '@mui/icons-material/Info';
 import AddIcon from '@mui/icons-material/Add';
+import { useDetectClickOutside } from 'react-detect-click-outside';
+import 'react-contexify/ReactContexify.css';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline';
+import ClearAllIcon from '@mui/icons-material/ClearAll';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import FileCopyIcon from '@mui/icons-material/FileCopy';
+
+import { Menu, Item, Separator, useContextMenu } from 'react-contexify';
+
+const MENU_ID = 'blahblah';
 
 const drawerWidth = 250;
 export type TableNav = {
@@ -37,6 +48,13 @@ export type SideNavProps = {
     viewIndexOverride: number;
     children: React.ReactNode;
     dbName?: string;
+    dataBases: Array<string>;
+    currentDatabase: string;
+    onTableTruncate: (tableName: string) => void;
+    onTableDelete: (tableName: string) => void;
+    onTableGetDDL: (tableName: string) => void;
+    onTableRename: (tableName: string) => void;
+    onTableClone: (tableName: string) => void;
 };
 export default function SideNav(s: SideNavProps) {
     let { tables } = s;
@@ -45,18 +63,62 @@ export default function SideNav(s: SideNavProps) {
     }
 
     tables = tables.sort((a, b) => a.Name.localeCompare(b.Name));
+
+    const menuRef = useDetectClickOutside({
+        onTriggered: () => {
+            console.log('clicked outside');
+            hideAll();
+        },
+    });
     const [tbls, setTables] = React.useState([]);
     const [searchTerm, setSearchTerm] = React.useState('');
+    const [tHover, setTableHovered] = React.useState(tbls[0]);
     const [viewIndex, setViewIndex] = React.useState(s.viewIndexOverride);
     const onChangeIndex = (event: React.SyntheticEvent, newValue: number) => {
         setViewIndex(newValue);
         s.onViewIndexChange && s.onViewIndexChange(newValue);
     };
+    const OnItemHover = (Name: string) => () => {
+        setTableHovered(Name);
+    };
+    const { show, hideAll } = useContextMenu({
+        id: MENU_ID,
+    });
+    const handleContextMenu = (event: any) => {
+        show({
+            event,
+            props: {
+                tableName: tHover,
+            },
+        });
+    };
+    const handleItemClick = ({ id, event, props }) => {
+        switch (id) {
+            case 'SHOW_CREATE_STMT':
+                s.onTableGetDDL(props.tableName);
+                break;
+            case 'cut':
+                console.log(event, props);
+                break;
+            case 'CLONE_TABLE':
+                s.onTableClone(props.tableName);
+                break;
+            case 'RENAME':
+                s.onTableRename(props.tableName);
+                break;
+            case 'TRUNCATE':
+                s.onTableTruncate(props.tableName);
+                break;
+            case 'DROP':
+                s.onTableDelete(props.tableName);
+                break;
+        }
+    };
     React.useEffect(() => {
         console.log('use effects');
         setTables(tables);
         filterTableVal(searchTerm);
-    }, [viewIndex, tables]);
+    }, [viewIndex, tables, tHover]);
     const filterTableVal = (val: string) => {
         setSearchTerm(val);
         if (val == '') {
@@ -81,8 +143,8 @@ export default function SideNav(s: SideNavProps) {
             >
                 <Toolbar>
                     <DBSelect
-                        selectedDB={'main_db'}
-                        dbs={['main_db', 'second_db']}
+                        selectedDB={s.currentDatabase}
+                        dbs={s.dataBases}
                     ></DBSelect>
 
                     <div style={{ width: '100%', textAlign: 'center' }}>
@@ -183,8 +245,10 @@ export default function SideNav(s: SideNavProps) {
                                     s.onTableSelected(Name);
                                 }
                             }}
+                            onMouseEnter={OnItemHover(Name)}
+                            onMouseExit={OnItemHover(Name)}
                         >
-                            <ListItemButton>
+                            <ListItemButton onContextMenu={handleContextMenu}>
                                 <ListItemIcon>
                                     {Type == 'table' ? (
                                         <FormatAlignJustifyIcon htmlColor="#B99100" />
@@ -194,6 +258,71 @@ export default function SideNav(s: SideNavProps) {
                                 </ListItemIcon>
                                 <ListItemText primary={Name} />
                             </ListItemButton>
+                            <Menu id={MENU_ID}>
+                                <Item
+                                    id="SHOW_CREATE_STMT"
+                                    onClick={handleItemClick}
+                                >
+                                    <ContentCopyIcon
+                                        fontSize={'12px'}
+                                        style={{ marginRight: '5px' }}
+                                    ></ContentCopyIcon>
+                                    Copy Create Statement
+                                </Item>
+                                <Item
+                                    id="CLONE_TABLE"
+                                    onClick={handleItemClick}
+                                >
+                                    <FileCopyIcon
+                                        fontSize={'12px'}
+                                        style={{ marginRight: '5px' }}
+                                    ></FileCopyIcon>
+                                    Clone
+                                </Item>
+                                <Item id="RENAME" onClick={handleItemClick}>
+                                    <DriveFileRenameOutlineIcon
+                                        fontSize={'12px'}
+                                        style={{ marginRight: '5px' }}
+                                    ></DriveFileRenameOutlineIcon>
+                                    Rename
+                                </Item>
+                                <Item
+                                    id="TRUNCATE"
+                                    onClick={handleItemClick}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.backgroundColor =
+                                            '#e13570';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.backgroundColor =
+                                            'white';
+                                    }}
+                                >
+                                    <ClearAllIcon
+                                        fontSize={'12px'}
+                                        style={{ marginRight: '5px' }}
+                                    ></ClearAllIcon>
+                                    Truncate
+                                </Item>
+                                <Item
+                                    id="DROP"
+                                    onClick={handleItemClick}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.backgroundColor =
+                                            '#e13570';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.backgroundColor =
+                                            'white';
+                                    }}
+                                >
+                                    <DeleteForeverIcon
+                                        fontSize={'12px'}
+                                        style={{ marginRight: '5px' }}
+                                    ></DeleteForeverIcon>
+                                    Drop Table
+                                </Item>
+                            </Menu>
                         </ListItem>
                     ))}
                 </List>

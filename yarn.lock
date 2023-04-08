@@ -2842,7 +2842,7 @@
   dependencies:
     "@types/node" "*"
 
-"@types/debug@^4.1.6", "@types/debug@^4.1.7":
+"@types/debug@^4.0.0", "@types/debug@^4.1.6", "@types/debug@^4.1.7":
   version "4.1.7"
   resolved "https://registry.npmjs.org/@types/debug/-/debug-4.1.7.tgz"
   integrity sha512-9AonUzyTjXXhEOa0DnqpzZi6VHlqKMswga9EXjpXnnqxwLtdvPPtlO8evrI5D9S6asFRCQ6v+wpiUKbw+vKqyg==
@@ -3937,6 +3937,14 @@ axe-core@^4.0.2, axe-core@^4.4.3:
   version "4.4.3"
   resolved "https://registry.npmjs.org/axe-core/-/axe-core-4.4.3.tgz"
   integrity sha512-32+ub6kkdhhWick/UjvEwRchgoetXqTK14INLqbGm5U2TzBkBNF3nQtLYm8ovxSkQWArjEQvftCKryjZaATu3w==
+
+axios-debug-log@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/axios-debug-log/-/axios-debug-log-1.0.0.tgz#e0f1246d440170cae8c67777b61023e9a5c9487f"
+  integrity sha512-ZjMaEBEij9w+Vbk2Uc3XflchTT7j9rZdYD/snN+XQ5FRDq1QjZNhh0Izb3KSyarU5vTkiCvJyg1xDiQBHZZB9w==
+  dependencies:
+    "@types/debug" "^4.0.0"
+    debug "^4.0.0"
 
 axios@^0.27.2:
   version "0.27.2"
@@ -5059,7 +5067,7 @@ debug@2.6.9, debug@^2.6.0, debug@^2.6.8, debug@^2.6.9:
   dependencies:
     ms "2.0.0"
 
-debug@4, debug@^4.0.1, debug@^4.1.0, debug@^4.1.1, debug@^4.3.1, debug@^4.3.2, debug@^4.3.3, debug@^4.3.4:
+debug@4, debug@^4.0.0, debug@^4.0.1, debug@^4.1.0, debug@^4.1.1, debug@^4.3.1, debug@^4.3.2, debug@^4.3.3, debug@^4.3.4:
   version "4.3.4"
   resolved "https://registry.npmjs.org/debug/-/debug-4.3.4.tgz"
   integrity sha512-PRWFHuSU3eDtQJPvnNY7Jcket1j0t5OuOsFzPPzsekD52Zl8qUfFIPEiswXqIvHWGVHOgX+7G/vCNNhehwxfkQ==
@@ -5125,6 +5133,11 @@ default-gateway@^6.0.3:
   integrity sha512-fwSOJsbbNzZ/CUFpqFBqYfYNLj1NbMPm8MMCIzHjC83iSJRBEGmDUxU+WP661BaBQImeC2yHwXtz+P/O9o+XEg==
   dependencies:
     execa "^5.0.0"
+
+default-shell@^2.0.0:
+  version "2.2.0"
+  resolved "https://registry.yarnpkg.com/default-shell/-/default-shell-2.2.0.tgz#31481c19747bfe59319b486591643eaf115a1864"
+  integrity sha512-sPpMZcVhRQ0nEMDtuMJ+RtCxt7iHPAMBU+I4tAlo5dU1sjRpNax0crj6nR3qKpvVnckaQ9U38enXcwW9nZJeCw==
 
 defaults@^1.0.3:
   version "1.0.3"
@@ -6141,7 +6154,7 @@ events@^3.2.0:
   resolved "https://registry.npmjs.org/events/-/events-3.3.0.tgz"
   integrity sha512-mQw+2fkQbALzQ7V0MY0IqdnXNOeTtP4r0lN9z7AAawCXgqea7bDii20AYrIBrFd/Hx0M2Ocz6S111CaFkUcb0Q==
 
-execa@^5.0.0:
+execa@^5.0.0, execa@^5.1.1:
   version "5.1.1"
   resolved "https://registry.npmjs.org/execa/-/execa-5.1.1.tgz"
   integrity sha512-8uSpZZocAZRBAPIEINJj3Lo9HyGitllczc27Eh5YYojjMFMn8yHMDMaUHE2Jqfq05D/wucwI4JGURyXt1vchyg==
@@ -6394,6 +6407,13 @@ find-up@^5.0.0:
   dependencies:
     locate-path "^6.0.0"
     path-exists "^4.0.0"
+
+fix-path@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/fix-path/-/fix-path-4.0.0.tgz#bc1d14f038edb734ac46944a45454106952ca429"
+  integrity sha512-g31GX207Tt+psI53ZSaB1egprYbEN0ZYl90aKcO22A2LmCNnFsSq3b5YpoKp3E/QEiWByTXGJOkFQG4S07Bc1A==
+  dependencies:
+    shell-path "^3.0.0"
 
 flat-cache@^3.0.4:
   version "3.0.4"
@@ -9867,6 +9887,18 @@ react-code-editor-editable@^0.6.3:
   dependencies:
     highlight.js "^10.5.0"
 
+react-contexify@^5.0.1-1:
+  version "5.0.1-1"
+  resolved "https://registry.yarnpkg.com/react-contexify/-/react-contexify-5.0.1-1.tgz#b5f3753d58eac6de2c180ae7220bfad057051e81"
+  integrity sha512-9UpuKqSxAYxzjdANEqQmIZFR7n4/1X5G5CptnfIBWWDvNGyBvye1ujnVrTo6I7raAf6irURfUN0VkwaFir90Fw==
+  dependencies:
+    clsx "^1.2.1"
+
+react-detect-click-outside@^1.1.7:
+  version "1.1.7"
+  resolved "https://registry.yarnpkg.com/react-detect-click-outside/-/react-detect-click-outside-1.1.7.tgz#8dd5766544475ab0d55084b3e2a35165e9a47854"
+  integrity sha512-dMrBZD7JW0Eh/uYNmMLTNwFj6afGYxAnc80fDSGJdjXjxJddH8ZazyMg2emyb8CAx9Hilr+r1fY+tm7O7m9eJg==
+
 react-dom@^18.2.0:
   version "18.2.0"
   resolved "https://registry.npmjs.org/react-dom/-/react-dom-18.2.0.tgz"
@@ -10630,6 +10662,22 @@ shebang-regex@^3.0.0:
   version "3.0.0"
   resolved "https://registry.npmjs.org/shebang-regex/-/shebang-regex-3.0.0.tgz"
   integrity sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==
+
+shell-env@^4.0.0:
+  version "4.0.1"
+  resolved "https://registry.yarnpkg.com/shell-env/-/shell-env-4.0.1.tgz#883302d9426095d398a39b102a851adb306b8cb8"
+  integrity sha512-w3oeZ9qg/P6Lu6qqwavvMnB/bwfsz67gPB3WXmLd/n6zuh7TWQZtGa3iMEdmua0kj8rivkwl+vUjgLWlqZOMPw==
+  dependencies:
+    default-shell "^2.0.0"
+    execa "^5.1.1"
+    strip-ansi "^7.0.1"
+
+shell-path@^3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/shell-path/-/shell-path-3.0.0.tgz#5c95bc68aade43c06082a0655cb5c97586e4feb0"
+  integrity sha512-HNIZ+W/3P0JuVTV03xjGqYKt3e3h0/Z4AH8TQWeth1LBtCusSjICgkdNdb3VZr6mI7ijE2AiFFpgkVMNKsALeQ==
+  dependencies:
+    shell-env "^4.0.0"
 
 shell-quote@^1.7.3:
   version "1.7.3"

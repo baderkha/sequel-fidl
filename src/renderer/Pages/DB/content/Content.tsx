@@ -23,6 +23,7 @@ import { generateSchemaFromTableRows } from 'renderer/util/GenerateSchemaFromTab
 
 export type ContentTabProps = {
     TableName: string;
+    refreshStamp: number;
 };
 
 export const Content = (p: ContentTabProps) => {
@@ -50,7 +51,7 @@ export const Content = (p: ContentTabProps) => {
 
                 setTableRows(data);
             });
-    }, [conID, p.TableName]);
+    }, [conID, p.TableName, p.refreshStamp]);
 
     return (
         <div style={{ width: '100%', height: '100%' }}>

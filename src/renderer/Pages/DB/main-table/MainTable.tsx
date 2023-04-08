@@ -42,7 +42,7 @@ export function MainTable(props: DataTableProps) {
             pageSize={props.maxRowPerPage ? props.maxRowPerPage : 17}
             isCellEditable={() => true}
             experimentalFeatures={{ newEditingApi: true }}
-            rowsPerPageOptions={[5]}
+            rowsPerPageOptions={[25, 50, 100]}
             checkboxSelection={!props.disableCheckBox}
             getRowId={(row: any) => {
                 if (props.Schema && props.Schema.primaryKey) {

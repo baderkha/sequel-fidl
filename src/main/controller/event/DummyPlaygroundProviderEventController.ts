@@ -9,7 +9,9 @@ export const DummyPlaygroundProviderEventController = (
 ) => {
     e.handle('init_dummy_playground', async () => {
         if (!conIDMain) {
-            const [res] = await pser.newPlayground('mysql', '5.7');
+            const [res, err] = await pser.newPlayground('mysql', '5.7');
+            console.log('error', err);
+            console.log('res', res);
             const [conID] = await pser.connectToLivePlayground(
                 res.pground,
                 res.procId

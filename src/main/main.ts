@@ -16,6 +16,7 @@ import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 import { SHUTDOWN_SERVICE_EV } from './util/pubsub';
 import { InitEventListeners } from './controller/event/init';
+import { clipboard } from 'electron';
 
 class AppUpdater {
     constructor() {
@@ -139,7 +140,7 @@ ipcMain.on('app_quit', () => {
 });
 
 app.whenReady()
-    .then(() => InitEventListeners())
+    .then(() => InitEventListeners(clipboard))
     .then(() => {
         createWindow();
         app.on('activate', () => {

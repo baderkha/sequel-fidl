@@ -29,11 +29,15 @@ const saveFile =
             type: 'text/plain',
         });
         element.href = URL.createObjectURL(file);
-        element.download = `file.${isJSON ? 'json' : 'csv'}`;
+        element.download = `export-${Date.now()}.${isJSON ? 'json' : 'csv'}`;
         element.click();
     };
 
-export const QueryFile = () => {
+export type QueryFileProps = {
+    onQueryCalled?: () => void;
+};
+
+export const QueryFile = (q: QueryFileProps) => {
     const [conID] = useAtom(DummyConID);
     let editorRef = React.useRef();
     const [code, setCode] = React.useState(' ');
@@ -56,6 +60,7 @@ export const QueryFile = () => {
         <div style={{ width: '100%', height: '100%' }}>
             <div style={{ width: '100%', height: '55.5%' }}>
                 <CodeEditorIFRAME
+                    disableExport={!(tableRows.length && tableRows.length > 0)}
                     onRun={function (selection: string): void {
                         window.electron.ipcRenderer
                             .invokeAs<ErrorTuple<any[]>>(
@@ -74,6 +79,7 @@ export const QueryFile = () => {
                                 }
                                 setSuccessMsg('executed query !');
                                 setTableRows(res);
+                                q.onQueryCalled && q.onQueryCalled();
                             });
                     }}
                     tables={[]}
@@ -101,6 +107,8 @@ export const QueryFile = () => {
                 }}
                 Data={tableRows}
                 Schema={generateSchemaFromTableRows(tableRows)}
+                rowCount={tableRows.length}
+                maxRowPerPage={100}
             />
             <Snackbar
                 open={!!errMsg}

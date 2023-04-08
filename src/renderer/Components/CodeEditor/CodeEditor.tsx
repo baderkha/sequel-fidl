@@ -25,6 +25,7 @@ export type CodeEditorProps = {
     columns: { tableOwner: string; name: string }[];
     onSaveJSON: () => void;
     onSaveCSV: () => void;
+    disableExport: boolean;
 };
 
 export const CodeEditorIFRAME = (props: CodeEditorProps) => {
@@ -118,6 +119,7 @@ export const CodeEditorIFRAME = (props: CodeEditorProps) => {
                 <ButtonGroup variant="outlined">
                     <Button
                         id="beautify-btn"
+                        disabled={props.disableExport}
                         onClick={props.onSaveCSV}
                         size="small"
                         sx={{
@@ -129,6 +131,7 @@ export const CodeEditorIFRAME = (props: CodeEditorProps) => {
                         Export AS CSV
                     </Button>
                     <Button
+                        disabled={props.disableExport}
                         id="beautify-btn"
                         onClick={props.onSaveJSON}
                         size="small"

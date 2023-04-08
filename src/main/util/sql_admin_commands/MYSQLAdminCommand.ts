@@ -6,6 +6,23 @@ import { ColSchema, AdminSQLCommand, Table } from '.';
  * @author Ahmad Baderkhan
  */
 export class MYSQLAdminCommand extends AdminSQLCommand {
+    ShowCreateTable(con: Sequelize, tableName: string): Promise<string> {
+        return con
+            .query(`SHOW CREATE TABLE ${tableName}`)
+            .then((res) => res[0] as string)
+            .catch(() => '');
+    }
+    RenameTable(
+        con: Sequelize,
+        oldTableName: string,
+        newTableName: string
+    ): Promise<Error> {
+        return con
+            .query(`RENAME TABLE ${oldTableName} TO ${newTableName}`)
+            .then(() => null)
+            .catch((err) => err);
+    }
+
     ShowAllTables(con: Sequelize): Promise<Table[]> {
         return con
             .query('SHOW FULL TABLES')

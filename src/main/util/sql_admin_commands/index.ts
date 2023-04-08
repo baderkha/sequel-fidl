@@ -53,6 +53,15 @@ export type SelectInput = {
 };
 
 export abstract class AdminSQLCommand {
+    abstract RenameTable(
+        con: Sequelize,
+        oldTableName: string,
+        newTableName: string
+    ): Promise<Error>;
+    abstract ShowCreateTable(
+        con: Sequelize,
+        tableName: string
+    ): Promise<string>;
     abstract ShowAllTables(con: Sequelize): Promise<Table[]>;
     abstract ShowCreateSQL(con: Sequelize, tableName: string): Promise<string>;
     abstract ShowSchema(
@@ -61,6 +70,20 @@ export abstract class AdminSQLCommand {
     ): Promise<ColSchema[]>;
     abstract ListDatabases(con: Sequelize): Promise<string[]>;
     abstract GetSupportedTypes(): string[];
+
+    TruncateTable(con: Sequelize, tableName: string): Promise<Error> {
+        return con
+            .query(`TRUNCATE TABLE ${tableName}`)
+            .then(() => null)
+            .catch((err) => err as Error);
+    }
+
+    DropTable(con: Sequelize, tableName: string): Promise<Error> {
+        return con
+            .query(`DROP TABLE ${tableName}`)
+            .then(() => null)
+            .catch((err) => err as Error);
+    }
 
     CreateTable(
         con: Sequelize,
@@ -90,6 +113,35 @@ export abstract class AdminSQLCommand {
             )
             .then(() => null)
             .catch((err) => err);
+    }
+
+    async CloneTable(
+        con: Sequelize,
+        tableName: string,
+        duplicateName: string,
+        duplicateContent: boolean = false
+    ): Promise<Error> {
+        const t = await con.transaction();
+        let err_: Error;
+        try {
+            await con.query(`CREATE TABLE ${duplicateName} LIKE ${tableName}`, {
+                transaction: t,
+            });
+            if (duplicateContent) {
+                await con.query(
+                    `INSERT INTO ${duplicateName} SELECT * FROM ${tableName}`,
+                    {
+                        transaction: t,
+                    }
+                );
+            }
+            await t.commit();
+        } catch (err) {
+            err_ = err as Error;
+            await t.rollback();
+        }
+
+        return err_;
     }
 
     SelectFromTable(con: Sequelize, s: SelectInput): Promise<any[]> {

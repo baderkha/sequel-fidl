@@ -1,4 +1,5 @@
 import * as shell from 'child_process';
+import { stderr } from 'process';
 /**
  * Safley executes commands with user input without worrying about
  * command line injection
@@ -29,6 +30,12 @@ export class Commander {
                         console.log(output);
                         console.log(stdErr);
                     }
+                    console.log(
+                        'COMMAND DEBUG : err =>',
+                        err,
+                        'OUTPUT => ',
+                        output
+                    );
                     if (err) {
                         reject(stdErr);
                     } else {

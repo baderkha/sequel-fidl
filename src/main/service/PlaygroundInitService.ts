@@ -91,6 +91,7 @@ export class PlaygroundInitService extends DBInitService {
             port: out.Port,
             defaultDB: out.DefaultGeneratedDatabase,
         });
+        console.log(con);
         err = await this.repo.Create(con);
         if (err != null) {
             return NewErrorTuple(null, err);

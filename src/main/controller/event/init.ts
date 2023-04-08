@@ -11,7 +11,9 @@ import { PlaygroundEventController } from './PlaygroundEventController';
 import { SQLEventController } from './SQLEventController';
 import { DBVersions } from '../../model/DBVersions';
 
-export const InitEventListeners = async (): Promise<void> => {
+export const InitEventListeners = async (
+    cboard: Electron.Clipboard
+): Promise<void> => {
     {
         await migrate(PlaygroundConnection, GetPersistentDBConnection());
         await migrate(Connection, GetPersistentDBConnection());
@@ -20,7 +22,7 @@ export const InitEventListeners = async (): Promise<void> => {
     }
 
     PlaygroundEventController(ipcMain, PlaygroundInitService.Default());
-    SQLEventController(ipcMain, SQLService.Default());
+    SQLEventController(cboard, ipcMain, SQLService.Default());
     DummyPlaygroundProviderEventController(
         ipcMain,
         PlaygroundInitService.Default(),

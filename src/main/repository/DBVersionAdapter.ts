@@ -41,13 +41,13 @@ export class DBVersionsRestAdapter extends DBVersionsSQLite {
         let pageNumber = 1;
 
         while (canGonext) {
+            const url = `https://registry.hub.docker.com/v2/repositories/library/${imageName}/tags?page_size=100&page=${pageNumber}`;
             res = [
                 ...res,
                 ...(await this.client
-                    .get(
-                        `https://registry.hub.docker.com/v2/repositories/library/${imageName}/tags?page_size=100&page=${pageNumber}`
-                    )
+                    .get(url)
                     .then((data) => {
+                        console.log('axios ', url, ' success', data);
                         if (!data.data.next) {
                             canGonext = false;
                         }
@@ -60,8 +60,9 @@ export class DBVersionsRestAdapter extends DBVersionsSQLite {
                             return r;
                         });
                     })
-                    .catch(() => {
+                    .catch((e) => {
                         canGonext = false;
+                        console.log('axios ', url, ' failed ', e);
                         return [];
                     })),
             ];
@@ -89,7 +90,9 @@ export class DBVersionsRestAdapter extends DBVersionsSQLite {
 
     async FindAll(): Promise<DBVersions[]> {
         if (!this.hasCache) {
+            console.log('populating');
             const all = await this.scrapeVersions();
+            console.log(all);
             await this.CreateMany(...all);
             this.hasCache = true;
             return all;

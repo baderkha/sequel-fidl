@@ -10,7 +10,7 @@ export const BASE_APP_DATA_PATH = path.join(
     }),
     'sql-fidl'
 );
-
+console.log('PATH', process.env.PATH);
 console.log(BASE_APP_DATA_PATH);
 
 /**

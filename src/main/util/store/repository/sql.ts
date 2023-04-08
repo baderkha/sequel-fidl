@@ -54,10 +54,15 @@ export class BaseSQLRepository<T extends IBaseModel> implements Repository<T> {
             .catch(() => NewTuple(null, false));
     }
     getDb() {
+        for (let i in this.con.models) {
+            console.log(i);
+            console.log(this.con.models[i].tableName);
+        }
         return this.con.models[this.model];
     }
 
     Create(mdl: T): Promise<Error> {
+        console.log('tname', this.getDb().tableName);
         return this.getDb()
             .create({ ...(mdl as any) })
             .then(() => null)
