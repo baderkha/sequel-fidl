@@ -31,11 +31,22 @@ export function MainTable(props: DataTableProps) {
     return (
         <DataGrid
             components={props.components}
-            sx={{ ...props.sx, overflow: 'auto' }}
+            sx={{
+                ...props.sx,
+                overflow: 'visible',
+                m: 0,
+                '.MuiDataGrid-columnSeparator': {
+                    display: 'none',
+                },
+                '.MuiDataGrid-columnHeader': {
+                    borderRight: '1px solid rgba(224, 224, 224, 1)',
+                },
+            }}
             editMode="row"
             onPageChange={(pageNumber: number) =>
                 props.onPageChange && props.onPageChange(pageNumber)
             }
+            showCellRightBorder={true}
             rows={props.Data ? props.Data : []}
             rowCount={props.rowCount ? props.rowCount : 0}
             columns={props.Schema && props.Schema.cols ? props.Schema.cols : []}
