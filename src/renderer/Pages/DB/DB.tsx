@@ -31,6 +31,7 @@ export function DBView() {
     const [selectedTable, setSelectedTable] = useState('');
     const [dbs, setDbs] = useState([]);
     const [selectedDB, setSelectedDB] = useState('');
+    const [dialectInfo, setDialectInfo] = useState({});
     const [hoveredTable, setHoveredTable] = useState('');
     const [isTableCloneShown, setIsTableCloneShown] = useState(false);
     const [isTableRenameShown, setisTableRenameShown] = useState(false);
@@ -110,7 +111,10 @@ export function DBView() {
                 'get_dialect_info',
                 new GetDialectInfoEvent().WithData({ conID: conID }).Build()
             )
-            .then((res) => setSelectedDB(res.DatabaseName));
+            .then((res) => {
+                setSelectedDB(res.DatabaseName)
+                setDialectInfo(res)
+            });
     };
     const onTabViewIndexChange = (idx: number) => {
         console.log(idx);
@@ -253,6 +257,8 @@ export function DBView() {
                 onTableTruncate={onTableTruncate}
                 onTableDelete={onTableDrop}
                 onDBChange={onDBChange}
+                dialectInfo={dialectInfo}
+                conLabel='php-dev'
             ></SideNav>
             <div
                 style={{

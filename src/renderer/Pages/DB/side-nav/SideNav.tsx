@@ -32,6 +32,8 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import FileCopyIcon from '@mui/icons-material/FileCopy';
 
 import { Menu, Item, Separator, useContextMenu } from 'react-contexify';
+import { DialectInfoRes } from 'main/service/SQLService';
+import { propNames } from '@chakra-ui/react';
 
 const MENU_ID = 'blahblah';
 
@@ -56,6 +58,8 @@ export type SideNavProps = {
     onTableRename: (tableName: string) => void;
     onTableClone: (tableName: string) => void;
     onDBChange : (newSchemaName : string) => void;
+    dialectInfo : DialectInfoRes;
+    conLabel : string;
 };
 export default function SideNav(s: SideNavProps) {
     let { tables } = s;
@@ -152,7 +156,7 @@ export default function SideNav(s: SideNavProps) {
 
                     <div style={{ width: '100%', textAlign: 'center' }}>
                         <Typography variant="caption">
-                            (MYSQL v5.7) php-dev
+                            {`(${s.dialectInfo.Dialect.toUpperCase()} v${s.dialectInfo.Version}) ${s.conLabel}`}
                         </Typography>
                         <Tabs
                             value={viewIndex}
