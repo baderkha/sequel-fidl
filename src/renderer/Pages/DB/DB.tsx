@@ -8,6 +8,7 @@ import {
     RenameTableEvent,
     ShowAllTablesEvent,
     ShowCreateTableEvent,
+    SwitchDataBaseEvent,
     TruncateTableEvent,
 } from '../../../main/controller/event/SQLEventController';
 import React, { useState } from 'react';
@@ -69,6 +70,22 @@ export function DBView() {
         setIsTableDropShown(true);
         setHoveredTable(tableName);
     };
+    const onDBChange = (newDB : string) => {
+        window.electron.ipcRenderer.
+            invokeAs<Error>(
+                "switch_database",
+                new SwitchDataBaseEvent().WithData({
+                    conID : conID,
+                    dbName: newDB,
+                }).Build()
+            ).then((err)=>{
+                if (err){
+                    console.log(err) // implement fatal error screen and crash
+                } else {
+                    RefreshAll()
+                }
+            })
+    }
     const genTables = () => {
         window.electron.ipcRenderer
             .invokeAs<Array<string>>(
@@ -235,6 +252,7 @@ export function DBView() {
                 onTableRename={onTableRename}
                 onTableTruncate={onTableTruncate}
                 onTableDelete={onTableDrop}
+                onDBChange={onDBChange}
             ></SideNav>
             <div
                 style={{

@@ -8,9 +8,13 @@ import Select, { SelectChangeEvent } from '@mui/material/Select';
 export type DBSelectProps = {
     dbs?: Array<string>;
     selectedDB: string;
+    OnDBSeletionChange : (newDB : string) =>void;
 };
 
 export function DBSelect(props: DBSelectProps) {
+    const onDBChange = (tableName : string)=>{
+        props.OnDBSeletionChange && props.OnDBSeletionChange(tableName)
+    }
     return (
         <div style={{ minWidth: 200 }}>
             <FormControl fullWidth>
@@ -21,10 +25,11 @@ export function DBSelect(props: DBSelectProps) {
                     value={props.selectedDB}
                     label="select db"
                     size="small"
+                    
                 >
                     {props.dbs && props.dbs.length
                         ? props.dbs.map((name) => {
-                              return <MenuItem value={name}>{name}</MenuItem>;
+                              return <MenuItem value={name} onClick={()=>{onDBChange(name)}}>{name}</MenuItem>;
                           })
                         : undefined}
                 </Select>

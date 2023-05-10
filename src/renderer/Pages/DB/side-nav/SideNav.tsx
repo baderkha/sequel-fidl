@@ -55,6 +55,7 @@ export type SideNavProps = {
     onTableGetDDL: (tableName: string) => void;
     onTableRename: (tableName: string) => void;
     onTableClone: (tableName: string) => void;
+    onDBChange : (newSchemaName : string) => void;
 };
 export default function SideNav(s: SideNavProps) {
     let { tables } = s;
@@ -92,6 +93,7 @@ export default function SideNav(s: SideNavProps) {
             },
         });
     };
+   
     const handleItemClick = ({ id, event, props }) => {
         switch (id) {
             case 'SHOW_CREATE_STMT':
@@ -145,6 +147,7 @@ export default function SideNav(s: SideNavProps) {
                     <DBSelect
                         selectedDB={s.currentDatabase}
                         dbs={s.dataBases}
+                        OnDBSeletionChange={s.onDBChange}
                     ></DBSelect>
 
                     <div style={{ width: '100%', textAlign: 'center' }}>
