@@ -1,5 +1,14 @@
 # Sequel Fidl
 
+## Why? 
+
+I started this a couple of years ago during covid as I hated all the db gui clients I used. 
+I wanted something that was tailored around my needs. Part of that revolved around the constant need for quick disposable dbs I can play around with to try out queries or different workflows that I would then use for pipeline related tasks at my job since I focused most of time back then on data pipelines, dashboards, and analytics. This process had me crunching out docker runs and remembering to clean them up .. restart ..etc. 
+
+Sometimes I wanted to quickly get a backend out without having to think about writing a docker-compose for just the db. I wanted something like the Lamp GUI apps you could install back in 2010 that just had all the batteries and off you go for those quick ideas. 
+
+The result is this pet project. It's super feature rich and dense with lots of expected and some new features that no one else thought of doing. I will admit I did use AI as it does a better job of cranking out the front end than I could ever, but the backend/IPC base was all my initial pattern/ architecture.
+
 <p align="center"> <img src="./assets/logo.png" /> </p>
 
 A desktop MySQL client in the spirit of Sequel Pro, with a modern dark UI. Connect to any MySQL server, or spin up a throwaway **playground** in Docker with one click: a real MySQL with sample data, which stops when you close its window.
