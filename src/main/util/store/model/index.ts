@@ -16,7 +16,21 @@ export const migrate = async (
 ) => {
     const mdl = new clase();
     const schema = mdl.GetSchema();
-    await con
-        .define(clase.name, schema[0], { ...schema[1], sequelize: con })
-        .sync();
+    const model = con.define(clase.name, schema[0], {
+        ...schema[1],
+        sequelize: con,
+    });
+    await model.sync();
+
+    // sync() never alters an existing table , add the columns new versions of the model introduced
+    const qi = con.getQueryInterface();
+    const existing = await qi.describeTable(model.getTableName());
+    for (const [col, def] of Object.entries(schema[0] as Record<string, any>)) {
+        if (!existing[col] && !def.primaryKey) {
+            await qi.addColumn(model.getTableName(), col, {
+                ...def,
+                allowNull: true,
+            });
+        }
+    }
 };

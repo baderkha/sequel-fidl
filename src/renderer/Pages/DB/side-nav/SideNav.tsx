@@ -1,339 +1,280 @@
-import * as React from 'react';
-import Box from '@mui/material/Box';
-import Drawer from '@mui/material/Drawer';
-import CssBaseline from '@mui/material/CssBaseline';
-import AppBar from '@mui/material/AppBar';
-import Toolbar from '@mui/material/Toolbar';
-import List from '@mui/material/List';
-import Typography from '@mui/material/Typography';
-import Divider from '@mui/material/Divider';
-import ListItem from '@mui/material/ListItem';
-import ListItemButton from '@mui/material/ListItemButton';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
-import TableViewIcon from '@mui/icons-material/TableView';
-import FormatAlignJustifyIcon from '@mui/icons-material/FormatAlignJustify';
-import TextField from '@mui/material/TextField';
+import React from 'react';
 import { search } from 'fast-fuzzy';
-import CustomDrawer from 'renderer/Components/CustomDrawer/CustomDrawer';
-import { DBSelect } from '../select-db/SelectDB';
-import { Tabs, Tab, IconButton } from '@mui/material';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-import SchemaIcon from '@mui/icons-material/Schema';
-import InfoIcon from '@mui/icons-material/Info';
-import AddIcon from '@mui/icons-material/Add';
-import { useDetectClickOutside } from 'react-detect-click-outside';
-import 'react-contexify/ReactContexify.css';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline';
-import ClearAllIcon from '@mui/icons-material/ClearAll';
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import FileCopyIcon from '@mui/icons-material/FileCopy';
+import {
+    ChevronDown,
+    ChevronRight,
+    Copy,
+    Database,
+    Download,
+    Eraser,
+    Eye,
+    Files,
+    Pencil,
+    Plus,
+    RefreshCw,
+    Search,
+    Sparkles,
+    Table2,
+    Trash2,
+} from 'lucide-react';
+import type { Table } from 'renderer/api';
+import { ContextMenu, useContextMenu } from 'renderer/Components/ui/ContextMenu';
+import type { TableAction } from 'renderer/Components/TableActions/TableActionDialogs';
 
-import { Menu, Item, Separator, useContextMenu } from 'react-contexify';
-import { DialectInfoRes } from 'main/service/SQLService';
-import { propNames } from '@chakra-ui/react';
-
-const MENU_ID = 'blahblah';
-
-const drawerWidth = 250;
-export type TableNav = {
-    Name: string;
-    Type: 'table' | 'view';
-};
 export type SideNavProps = {
-    tables: TableNav[];
-    onTableSelected: (tableName: string) => void;
-    onViewIndexChange: (index: number) => void;
-    onRefreshClicked: () => void;
-    viewIndexOverride: number;
-    children: React.ReactNode;
-    dbName?: string;
-    dataBases: Array<string>;
+    width: number;
+    tables: Table[];
+    selectedTable: string;
+    databases: string[];
     currentDatabase: string;
-    onTableTruncate: (tableName: string) => void;
-    onTableDelete: (tableName: string) => void;
-    onTableGetDDL: (tableName: string) => void;
-    onTableRename: (tableName: string) => void;
-    onTableClone: (tableName: string) => void;
-    onDBChange : (newSchemaName : string) => void;
-    dialectInfo : DialectInfoRes;
-    conLabel : string;
+    loading?: boolean;
+    onTableSelected: (tableName: string) => void;
+    onDatabaseChange: (db: string) => void;
+    onRefresh: () => void;
+    onCopyCreate: (tableName: string) => void;
+    onTableAction: (action: TableAction) => void;
+    onNewTable: () => void;
+    onSeed: (tableName: string) => void;
+    onExport: (tableName: string) => void;
+    /** several tables at once */
+    onExportMany: () => void;
+    /** the project explorer section (header actions + tree) */
+    explorer?: { title?: string; actions: React.ReactNode; body: React.ReactNode };
 };
-export default function SideNav(s: SideNavProps) {
-    let { tables } = s;
-    if (!tables) {
-        tables = new Array();
-    }
 
-    tables = tables.sort((a, b) => a.Name.localeCompare(b.Name));
+type SectionId = 'tables' | 'explorer';
+const SECTIONS_KEY = 'sequel-fidl.sidebar.collapsed';
 
-    const menuRef = useDetectClickOutside({
-        onTriggered: () => {
-            console.log('clicked outside');
-            hideAll();
-        },
+export default function SideNav(p: SideNavProps) {
+    const [query, setQuery] = React.useState('');
+    const [menuTable, setMenuTable] = React.useState('');
+    const menu = useContextMenu();
+    const searchRef = React.useRef<HTMLInputElement>(null);
+    const [collapsed, setCollapsed] = React.useState<Record<SectionId, boolean>>(() => {
+        try {
+            return JSON.parse(localStorage.getItem(SECTIONS_KEY) || '{}');
+        } catch (e) {
+            return {} as Record<SectionId, boolean>;
+        }
     });
-    const [tbls, setTables] = React.useState([]);
-    const [searchTerm, setSearchTerm] = React.useState('');
-    const [tHover, setTableHovered] = React.useState(tbls[0]);
-    const [viewIndex, setViewIndex] = React.useState(s.viewIndexOverride);
-    const onChangeIndex = (event: React.SyntheticEvent, newValue: number) => {
-        setViewIndex(newValue);
-        s.onViewIndexChange && s.onViewIndexChange(newValue);
-    };
-    const OnItemHover = (Name: string) => () => {
-        setTableHovered(Name);
-    };
-    const { show, hideAll } = useContextMenu({
-        id: MENU_ID,
-    });
-    const handleContextMenu = (event: any) => {
-        show({
-            event,
-            props: {
-                tableName: tHover,
-            },
+    const toggle = (id: SectionId) =>
+        setCollapsed((c) => {
+            const next = { ...c, [id]: !c[id] };
+            try {
+                localStorage.setItem(SECTIONS_KEY, JSON.stringify(next));
+            } catch (e) {}
+            return next;
         });
-    };
-   
-    const handleItemClick = ({ id, event, props }) => {
-        switch (id) {
-            case 'SHOW_CREATE_STMT':
-                s.onTableGetDDL(props.tableName);
-                break;
-            case 'cut':
-                console.log(event, props);
-                break;
-            case 'CLONE_TABLE':
-                s.onTableClone(props.tableName);
-                break;
-            case 'RENAME':
-                s.onTableRename(props.tableName);
-                break;
-            case 'TRUNCATE':
-                s.onTableTruncate(props.tableName);
-                break;
-            case 'DROP':
-                s.onTableDelete(props.tableName);
-                break;
-        }
-    };
-    React.useEffect(() => {
-        console.log('use effects');
-        setTables(tables);
-        filterTableVal(searchTerm);
-    }, [viewIndex, tables, tHover]);
-    const filterTableVal = (val: string) => {
-        setSearchTerm(val);
-        if (val == '') {
-            setTables(tables);
-            return;
-        }
-        const res = search(val, tables, { keySelector: (obj) => obj.Name });
 
-        setTables(res);
+    const visible = React.useMemo(() => {
+        const sorted = [...(p.tables || [])].sort((a, b) =>
+            a.Name.localeCompare(b.Name)
+        );
+        return query
+            ? search(query, sorted, { keySelector: (t) => t.Name })
+            : sorted;
+    }, [p.tables, query]);
+
+
+    const openMenu = (ev: React.MouseEvent, t: Table) => {
+        setMenuTable(t.Name);
+        const isView = t.Type === 'view';
+        menu.open(ev, [
+            {
+                label: 'Copy CREATE Statement',
+                icon: <Copy size={14} />,
+                onSelect: () => p.onCopyCreate(t.Name),
+            },
+            {
+                label: 'New Table…',
+                icon: <Plus size={14} />,
+                onSelect: p.onNewTable,
+            },
+            {
+                label: 'Seed with Fake Data…',
+                icon: <Sparkles size={14} />,
+                disabled: isView,
+                onSelect: () => p.onSeed(t.Name),
+            },
+            {
+                label: 'Export…',
+                icon: <Download size={14} />,
+                onSelect: () => p.onExport(t.Name),
+            },
+            'separator',
+            {
+                label: 'Duplicate…',
+                icon: <Files size={14} />,
+                disabled: isView,
+                onSelect: () => p.onTableAction({ kind: 'clone', table: t.Name }),
+            },
+            {
+                label: 'Rename…',
+                icon: <Pencil size={14} />,
+                onSelect: () => p.onTableAction({ kind: 'rename', table: t.Name }),
+            },
+            'separator',
+            {
+                label: 'Truncate…',
+                icon: <Eraser size={14} />,
+                danger: true,
+                disabled: isView,
+                onSelect: () =>
+                    p.onTableAction({ kind: 'truncate', table: t.Name }),
+            },
+            {
+                label: 'Drop Table…',
+                icon: <Trash2 size={14} />,
+                danger: true,
+                disabled: isView,
+                onSelect: () => p.onTableAction({ kind: 'drop', table: t.Name }),
+            },
+        ]);
     };
-    console.log('state var ', tbls);
+
+    // right click on the empty part of the list
+    const openListMenu = (ev: React.MouseEvent) => {
+        setMenuTable('');
+        menu.open(ev, [
+            {
+                label: 'New Table…',
+                icon: <Plus size={14} />,
+                onSelect: p.onNewTable,
+            },
+            {
+                label: 'Export Tables…',
+                icon: <Download size={14} />,
+                disabled: !p.tables.length,
+                onSelect: p.onExportMany,
+            },
+            {
+                label: 'Refresh',
+                icon: <RefreshCw size={14} />,
+                onSelect: p.onRefresh,
+            },
+        ]);
+    };
+
+    const onSearchKey = (ev: React.KeyboardEvent) => {
+        if (ev.key === 'Enter' && visible.length) {
+            p.onTableSelected(visible[0].Name);
+        } else if (ev.key === 'Escape') {
+            setQuery('');
+        }
+    };
+
     return (
-        <div style={{ display: 'flex' }}>
-            <CssBaseline />
-            <AppBar
-                position="fixed"
-                sx={{
-                    zIndex: (theme) => theme.zIndex.drawer + 2,
-                    backgroundColor: '#dedede',
-                }}
-                color="default"
-            >
-                <Toolbar>
-                    <DBSelect
-                        selectedDB={s.currentDatabase}
-                        dbs={s.dataBases}
-                        OnDBSeletionChange={s.onDBChange}
-                    ></DBSelect>
-
-                    <div style={{ width: '100%', textAlign: 'center' }}>
-                        <Typography variant="caption">
-                            {`(${s.dialectInfo.Dialect.toUpperCase()} v${s.dialectInfo.Version}) ${s.conLabel}`}
-                        </Typography>
-                        <Tabs
-                            value={viewIndex}
-                            onChange={onChangeIndex}
-                            centered
-                        >
-                            <Tab
-                                icon={<TableViewIcon htmlColor="#B99100" />}
-                                label="Content"
-                                sx={{ textTransform: 'none' }}
-                            />
-                            <Tab
-                                icon={<SchemaIcon htmlColor="#B99100" />}
-                                label="Structure"
-                                sx={{ textTransform: 'none' }}
-                            />
-                            <Tab
-                                icon={
-                                    <InsertDriveFileIcon htmlColor="#bf360c" />
-                                }
-                                label="Query"
-                                sx={{ textTransform: 'none' }}
-                            />
-                        </Tabs>
-                    </div>
-                </Toolbar>
-            </AppBar>
-
-            <CustomDrawer>
-                <Toolbar />
-                <Divider />
-
-                <div
-                    style={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        height: '70px',
-                        alignItems: 'center',
-                        userSelect: 'none',
-                    }}
-                >
-                    <div style={{ width: '92%' }}>
-                        <TextField
-                            fullWidth
-                            variant="outlined"
-                            label=""
-                            placeholder="search for table ..."
-                            id="fullWidth"
-                            onChange={(ev) => {
-                                filterTableVal(ev.target.value);
-                            }}
-                            size="small"
-                        />
-                    </div>
-                </div>
-                <Divider />
-
-                <div
-                    style={{
-                        width: '100%',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                    }}
-                >
-                    <Typography
-                        variant="subtitle1"
-                        style={{ marginLeft: '4px' }}
-                        sx={{
-                            color: '#808081',
-                            fontWeight: 'bold',
-                            marginTop: '5px',
-                            userSelect: 'none',
-                        }}
+        <aside className="sidebar" style={{ width: p.width }}>
+            <div className="sidebar-section">
+                <div className="input-with-icon">
+                    <Database size={13} />
+                    <select
+                        className="select app-input"
+                        style={{ paddingLeft: 28, width: '100%' }}
+                        value={p.currentDatabase}
+                        onChange={(ev) => p.onDatabaseChange(ev.target.value)}
+                        title="Database"
                     >
-                        Tables
-                    </Typography>
-                    <div>
-                        <IconButton>
-                            <AddIcon />
-                        </IconButton>
-                        <IconButton>
-                            <RefreshIcon onClick={s.onRefreshClicked} />
-                        </IconButton>
-                    </div>
+                        {!p.databases.includes(p.currentDatabase) && (
+                            <option value={p.currentDatabase}>
+                                {p.currentDatabase || 'Select database'}
+                            </option>
+                        )}
+                        {p.databases.map((db) => (
+                            <option key={db} value={db}>
+                                {db}
+                            </option>
+                        ))}
+                    </select>
                 </div>
-                <List>
-                    {tbls.map(({ Name, Type }, index) => (
-                        <ListItem
-                            key={Name}
-                            disablePadding
-                            onClick={() => {
-                                if (Type == 'table') {
-                                    s.onTableSelected(Name);
-                                }
-                            }}
-                            onMouseEnter={OnItemHover(Name)}
-                            onMouseExit={OnItemHover(Name)}
-                        >
-                            <ListItemButton onContextMenu={handleContextMenu}>
-                                <ListItemIcon>
-                                    {Type == 'table' ? (
-                                        <FormatAlignJustifyIcon htmlColor="#B99100" />
-                                    ) : (
-                                        <TableViewIcon htmlColor="purple" />
-                                    )}
-                                </ListItemIcon>
-                                <ListItemText primary={Name} />
-                            </ListItemButton>
-                            <Menu id={MENU_ID}>
-                                <Item
-                                    id="SHOW_CREATE_STMT"
-                                    onClick={handleItemClick}
-                                >
-                                    <ContentCopyIcon
-                                        fontSize={'12px'}
-                                        style={{ marginRight: '5px' }}
-                                    ></ContentCopyIcon>
-                                    Copy Create Statement
-                                </Item>
-                                <Item
-                                    id="CLONE_TABLE"
-                                    onClick={handleItemClick}
-                                >
-                                    <FileCopyIcon
-                                        fontSize={'12px'}
-                                        style={{ marginRight: '5px' }}
-                                    ></FileCopyIcon>
-                                    Clone
-                                </Item>
-                                <Item id="RENAME" onClick={handleItemClick}>
-                                    <DriveFileRenameOutlineIcon
-                                        fontSize={'12px'}
-                                        style={{ marginRight: '5px' }}
-                                    ></DriveFileRenameOutlineIcon>
-                                    Rename
-                                </Item>
-                                <Item
-                                    id="TRUNCATE"
-                                    onClick={handleItemClick}
-                                    onMouseEnter={(e) => {
-                                        e.target.style.backgroundColor =
-                                            '#e13570';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.target.style.backgroundColor =
-                                            'white';
-                                    }}
-                                >
-                                    <ClearAllIcon
-                                        fontSize={'12px'}
-                                        style={{ marginRight: '5px' }}
-                                    ></ClearAllIcon>
-                                    Truncate
-                                </Item>
-                                <Item
-                                    id="DROP"
-                                    onClick={handleItemClick}
-                                    onMouseEnter={(e) => {
-                                        e.target.style.backgroundColor =
-                                            '#e13570';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.target.style.backgroundColor =
-                                            'white';
-                                    }}
-                                >
-                                    <DeleteForeverIcon
-                                        fontSize={'12px'}
-                                        style={{ marginRight: '5px' }}
-                                    ></DeleteForeverIcon>
-                                    Drop Table
-                                </Item>
-                            </Menu>
-                        </ListItem>
-                    ))}
-                </List>
-            </CustomDrawer>
-        </div>
+                <div className="input-with-icon">
+                    <Search size={13} />
+                    <input
+                        ref={searchRef}
+                        className="app-input"
+                        placeholder="Filter tables"
+                        value={query}
+                        onChange={(ev) => setQuery(ev.target.value)}
+                        onKeyDown={onSearchKey}
+                    />
+                </div>
+            </div>
+            <div className={`sidebar-pane ${collapsed.tables ? 'is-collapsed' : ''}`}>
+            <div className="sidebar-label is-toggle" onClick={() => toggle('tables')}>
+                <span>
+                    {collapsed.tables ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                    Tables
+                    <span className="count">{p.tables.length}</span>
+                </span>
+                <span className="sidebar-actions" onClick={(ev) => ev.stopPropagation()}>
+                    <button
+                        type="button"
+                        className="icon-btn is-small"
+                        title="Export tables…"
+                        disabled={!p.tables.length}
+                        onClick={p.onExportMany}
+                    >
+                        <Download size={13} />
+                    </button>
+                    <button
+                        type="button"
+                        className="icon-btn is-small"
+                        title="New table"
+                        onClick={p.onNewTable}
+                    >
+                        <Plus size={14} />
+                    </button>
+                    <button
+                        type="button"
+                        className="icon-btn is-small"
+                        title="Refresh"
+                        onClick={p.onRefresh}
+                    >
+                        <RefreshCw size={13} className={p.loading ? 'spin' : ''} />
+                    </button>
+                </span>
+            </div>
+            <div className="table-list" onContextMenu={openListMenu}>
+                {visible.map((t) => (
+                    <div
+                        key={t.Name}
+                        className={`table-item ${t.Type === 'view' ? 'is-view' : ''} ${
+                            t.Name === p.selectedTable ? 'is-active' : ''
+                        } ${menu.state && menuTable === t.Name ? 'has-menu' : ''}`}
+                        onClick={() => p.onTableSelected(t.Name)}
+                        onContextMenu={(ev) => openMenu(ev, t)}
+                        title={t.Type === 'view' ? `${t.Name} (view)` : t.Name}
+                    >
+                        {t.Type === 'view' ? (
+                            <Eye size={14} className="table-item-icon" />
+                        ) : (
+                            <Table2 size={14} className="table-item-icon" />
+                        )}
+                        <span className="table-item-name">{t.Name}</span>
+                    </div>
+                ))}
+                {!visible.length && (
+                    <div className="sidebar-empty">
+                        {query ? 'No matching tables' : 'No tables'}
+                    </div>
+                )}
+            </div>
+            </div>
+            {p.explorer && (
+                <div className={`sidebar-pane ${collapsed.explorer ? 'is-collapsed' : ''}`}>
+                    <div className="sidebar-label is-toggle" onClick={() => toggle('explorer')}>
+                        <span>
+                            {collapsed.explorer ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                            <span className="explorer-title" title={p.explorer.title}>
+                                {p.explorer.title || 'Explorer'}
+                            </span>
+                        </span>
+                        <span onClick={(ev) => ev.stopPropagation()}>{p.explorer.actions}</span>
+                    </div>
+                    {p.explorer.body}
+                </div>
+            )}
+            <ContextMenu {...menu} />
+        </aside>
     );
 }

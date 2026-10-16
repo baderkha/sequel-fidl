@@ -1,45 +1,23 @@
-import { PlaygroundInitService } from 'main/service/PlaygroundInitService';
-import { Event } from 'main/util/event';
-import { DBType } from 'main/model/Connections';
-import { PlaygroundConnection } from 'main/model/PlaygroundConnection';
 import { IpcMain } from 'electron';
+import { NewPlaygroundInput, PlaygroundService } from '../../service/PlaygroundService';
+import { Event } from '../../util/event';
+import { SAMPLES } from '../../service/samples';
 
-export type NewPlaygroundEvent = Event<{ type: DBType; version: string }>;
-export type StopPlaygroundEvent = Event<{ conId: string }>;
-export type DeletePlaygroundEvent = Event<{ pgrounId: number }>;
-export type ConnectToPlaygroundEvent = Event<{
-    pground: PlaygroundConnection;
-    processId: string;
-}>;
+export class NewPlaygroundEvent extends Event<NewPlaygroundInput> {}
+export class PlaygroundIdEvent extends Event<{ id: number }> {}
+export class RenamePlaygroundEvent extends Event<{ id: number; name: string }> {}
 
-export const PlaygroundEventController = (
-    e: IpcMain,
-    ser: PlaygroundInitService
-) => {
-    e.handle('new_playground', async (_, arg: NewPlaygroundEvent) => {
-        return await ser.newPlayground(arg.Data.type, arg.Data.version);
-    });
-
-    e.handle(
-        'connect_to_playground',
-        async (_, arg: ConnectToPlaygroundEvent) => {
-            const res = await ser.connectToLivePlayground(
-                arg.Data.pground,
-                arg.Data.processId
-            );
-            return res;
-        }
+export const PlaygroundEventController = (e: IpcMain, ser: PlaygroundService) => {
+    e.handle('docker_available', () => ser.DockerAvailable());
+    e.handle('list_samples', () =>
+        SAMPLES.map(({ id, name, description, database }) => ({ id, name, description, database }))
     );
-
-    e.handle('stop_playground', async (_, arg: StopPlaygroundEvent) => {
-        return await ser.stopPlayground(arg.Data.conId);
-    });
-
-    e.handle('kill_all_playgrounds', async (_) => {
-        return await ser.killAllPlaygrounds();
-    });
-
-    e.handle('delete_playground', async (_, arg: DeletePlaygroundEvent) => {
-        return await ser.deletePlayground(arg.Data.pgrounId);
-    });
+    e.handle('list_playgrounds', () => ser.List());
+    e.handle('create_playground', (_, arg: NewPlaygroundEvent) => ser.Create(arg.Data));
+    e.handle('rename_playground', (_, arg: RenamePlaygroundEvent) =>
+        ser.Rename(arg.Data.id, arg.Data.name)
+    );
+    e.handle('open_playground', (_, arg: PlaygroundIdEvent) => ser.Open(arg.Data.id));
+    e.handle('stop_playground', (_, arg: PlaygroundIdEvent) => ser.Stop(arg.Data.id));
+    e.handle('delete_playground', (_, arg: PlaygroundIdEvent) => ser.Delete(arg.Data.id));
 };

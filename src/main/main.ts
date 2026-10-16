@@ -9,12 +9,25 @@
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
 import path from 'path';
-import { app, BrowserWindow, shell, ipcMain } from 'electron';
+import { app, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
-import MenuBuilder from './menu';
-import { resolveHtmlPath } from './util';
+import buildAppMenu from './menu';
+import {
+    hasWindows,
+    resolveOpenTransactions,
+    markQuitting,
+    showLauncher,
+    waitForWindowCleanups,
+    WindowEventController,
+} from './windows';
+import { GetPersistentDBConnection } from './config';
+import { ConManager } from './service/Connections';
+import { Transactions } from './service/Transactions';
+import { TerminalService } from './service/terminal/TerminalService';
+import { ExportService } from './service/export/ExportService';
 import { SHUTDOWN_SERVICE_EV } from './util/pubsub';
+import { PlaygroundService } from './service/PlaygroundService';
 import { InitEventListeners } from './controller/event/init';
 import { clipboard } from 'electron';
 
@@ -25,8 +38,6 @@ class AppUpdater {
         autoUpdater.checkForUpdatesAndNotify();
     }
 }
-
-let mainWindow: BrowserWindow | null = null;
 
 ipcMain.on('ipc-example', async (event, arg) => {
     const msgTemplate = (pingPong: string) => `IPC test: ${pingPong}`;
@@ -59,64 +70,12 @@ const installExtensions = async () => {
         .catch(console.log);
 };
 
-const createWindow = async () => {
-    if (isDebug) {
+let extensionsInstalled = false;
+const ensureExtensions = async () => {
+    if (isDebug && !extensionsInstalled) {
+        extensionsInstalled = true;
         await installExtensions();
     }
-
-    const RESOURCES_PATH = app.isPackaged
-        ? path.join(process.resourcesPath, 'assets')
-        : path.join(__dirname, '../../assets');
-
-    const getAssetPath = (...paths: string[]): string => {
-        return path.join(RESOURCES_PATH, ...paths);
-    };
-
-    mainWindow = new BrowserWindow({
-        show: false,
-
-        width: 1024,
-        height: 728,
-        autoHideMenuBar: true,
-        icon: getAssetPath('icon.png'),
-        webPreferences: {
-            webSecurity: false,
-            sandbox: false,
-            preload: app.isPackaged
-                ? path.join(__dirname, 'preload.js')
-                : path.join(__dirname, '../../.erb/dll/preload.js'),
-        },
-    });
-
-    mainWindow.loadURL(resolveHtmlPath('index.html'));
-
-    mainWindow.on('ready-to-show', () => {
-        if (!mainWindow) {
-            throw new Error('"mainWindow" is not defined');
-        }
-        if (process.env.START_MINIMIZED) {
-            mainWindow.minimize();
-        } else {
-            mainWindow.show();
-        }
-    });
-
-    mainWindow.on('closed', () => {
-        mainWindow = null;
-    });
-
-    const menuBuilder = new MenuBuilder(mainWindow);
-    menuBuilder.buildMenu();
-
-    // Open urls in the user's browser
-    mainWindow.webContents.setWindowOpenHandler((edata) => {
-        shell.openExternal(edata.url);
-        return { action: 'deny' };
-    });
-
-    // Remove this if your app does not use auto updates
-    // eslint-disable-next-line
-    new AppUpdater();
 };
 
 /**
@@ -131,9 +90,53 @@ app.on('window-all-closed', () => {
     }
 });
 
-app.on('before-quit', () => {
+// stop running playgrounds before quitting so mysql shuts down cleanly and nothing is left running
+let cleanedUp = false;
+app.on('before-quit', (ev) => {
     ipcMain.emit(SHUTDOWN_SERVICE_EV);
+    if (cleanedUp) {
+        return;
+    }
+    ev.preventDefault();
+    if (quitPrompting) {
+        return;
+    }
+    // open transactions first : commit / discard / cancel the quit
+    quitPrompting = true;
+    resolveOpenTransactions(null, Transactions.openIds()).then((ok) => {
+        quitPrompting = false;
+        if (ok) {
+            shutdownAndQuit();
+        }
+    });
 });
+
+let quitPrompting = false;
+let shuttingDown = false;
+const shutdownAndQuit = () => {
+    if (shuttingDown) {
+        return;
+    }
+    shuttingDown = true;
+    markQuitting();
+    const timeout = new Promise((r) => setTimeout(r, 30 * 1000));
+    const shutdown = async () => {
+        await waitForWindowCleanups();
+        TerminalService.Default().KillAll();
+        ExportService.Default().CancelAll();
+        await PlaygroundService.Default().StopAll();
+        await ConManager.GetInstance().RemoveAllAndKill([]);
+    };
+    Promise.race([shutdown(), timeout])
+        .catch(console.log)
+        // close sqlite last , a statement still running while node tears down aborts the process
+        .then(() => GetPersistentDBConnection().close())
+        .catch(console.log)
+        .finally(() => {
+            cleanedUp = true;
+            app.quit();
+        });
+};
 
 ipcMain.on('app_quit', () => {
     ipcMain.emit(SHUTDOWN_SERVICE_EV);
@@ -141,12 +144,23 @@ ipcMain.on('app_quit', () => {
 
 app.whenReady()
     .then(() => InitEventListeners(clipboard))
-    .then(() => {
-        createWindow();
+    .then(async () => {
+        // dev runs inside Electron.app , show our icon in the dock instead of electron's
+        if (process.platform === 'darwin' && !app.isPackaged) {
+            app.dock.setIcon(path.join(__dirname, '../../assets/icon.png'));
+        }
+        WindowEventController(ipcMain);
+        buildAppMenu({ openLauncher: showLauncher });
+        await ensureExtensions();
+        showLauncher();
+        // Remove this if your app does not use auto updates
+        // eslint-disable-next-line
+        new AppUpdater();
         app.on('activate', () => {
-            // On macOS it's common to re-create a window in the app when the
-            // dock icon is clicked and there are no other windows open.
-            if (mainWindow === null) createWindow();
+            // dock click with no windows open => back to the connection manager
+            if (!hasWindows()) {
+                showLauncher();
+            }
         });
     })
     .catch(console.log);

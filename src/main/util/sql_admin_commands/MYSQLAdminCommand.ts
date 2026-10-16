@@ -8,7 +8,7 @@ import { ColSchema, AdminSQLCommand, Table } from '.';
 export class MYSQLAdminCommand extends AdminSQLCommand {
     ShowCreateTable(con: Sequelize, tableName: string): Promise<string> {
         return con
-            .query(`SHOW CREATE TABLE ${tableName}`)
+            .query(`SHOW CREATE TABLE ${this.QuoteIdent(tableName)}`)
             .then((res) => res[0] as string)
             .catch(() => '');
     }
@@ -18,7 +18,9 @@ export class MYSQLAdminCommand extends AdminSQLCommand {
         newTableName: string
     ): Promise<Error> {
         return con
-            .query(`RENAME TABLE ${oldTableName} TO ${newTableName}`)
+            .query(`RENAME TABLE ${this.QuoteIdent(
+                    oldTableName
+                )} TO ${this.QuoteIdent(newTableName)}`)
             .then(() => null)
             .catch((err) => err);
     }
@@ -33,7 +35,7 @@ export class MYSQLAdminCommand extends AdminSQLCommand {
                         Type:
                             (obj['Table_type'] as string)
                                 .toLowerCase()
-                                .indexOf('view') > 0
+                                .indexOf('view') >= 0
                                 ? 'view'
                                 : 'table',
                     };
@@ -45,7 +47,7 @@ export class MYSQLAdminCommand extends AdminSQLCommand {
 
     ShowCreateSQL(con: Sequelize, tableName: string): Promise<string> {
         return con
-            .query(`SHOW CREATE TABLE ${tableName}`)
+            .query(`SHOW CREATE TABLE ${this.QuoteIdent(tableName)}`)
             .then((data) => {
                 const dat = data[0][0];
                 const idx = 'Create Table';
@@ -56,13 +58,16 @@ export class MYSQLAdminCommand extends AdminSQLCommand {
 
     ShowSchema(con: Sequelize, tableName: string): Promise<ColSchema[]> {
         return con
-            .query(`DESCRIBE ${tableName}`)
+            .query(`DESCRIBE ${this.QuoteIdent(tableName)}`)
             .then((data) => {
                 return data[0].map((res) => {
                     const col: ColSchema = {
                         FieldName: (res as any)['Field'],
                         Type: (res as any)['Type'],
                         IsPrimaryKey: (res as any)['Key'] == 'PRI',
+                        IsUnique: (res as any)['Key'] == 'UNI',
+                        AutoIncrement: /auto_increment/i.test((res as any)['Extra'] || ''),
+                        Extra: (res as any)['Extra'] || '',
                         Default: (res as any)['Default'],
                         NullAllowed: (res as any)['Null'] == 'YES',
                         JsFriendlyType: this.resolveJSType(

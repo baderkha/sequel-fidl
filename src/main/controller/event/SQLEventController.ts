@@ -1,6 +1,14 @@
 import { ipcMain } from 'electron';
 import { SQLService } from 'main/service/SQLService';
-import { CreateColSchema, SelectInput } from 'main/util/sql_admin_commands';
+import { Transactions } from '../../service/Transactions';
+import {
+    ColumnAssignment,
+    RowKey,
+    CreateColSchema,
+    Filter,
+    FilterMode,
+    SelectInput,
+} from 'main/util/sql_admin_commands';
 import { Event } from '../../util/event';
 
 type WithCon = {
@@ -8,7 +16,9 @@ type WithCon = {
 };
 
 export class GetDialectInfoEvent extends Event<WithCon> {}
-export class RunManualQueryEvent extends Event<{ query: string } & WithCon> {}
+export class RunManualQueryEvent extends Event<
+    { query: string; commitFirst?: boolean } & WithCon
+> {}
 export class ShowAllTablesEvent extends Event<WithCon> {}
 export class ShowCreateSQLEvent extends Event<
     { tableName: string } & WithCon
@@ -33,6 +43,18 @@ export class ShowCreateTableEvent extends Event<
 export class TruncateTableEvent extends ShowCreateTableEvent {}
 export class DropTableEvent extends TruncateTableEvent {}
 export class SelectFromTableEvent extends Event<{ s: SelectInput } & WithCon> {}
+export class InsertRowsEvent extends Event<
+    { tableName: string; columns: string[]; rows: any[][]; ignore?: boolean } & WithCon
+> {}
+export class DeleteRowsEvent extends Event<
+    { tableName: string; keys: RowKey[]; byAllColumns: boolean } & WithCon
+> {}
+export class UpdateRowsEvent extends Event<
+    { tableName: string; set: ColumnAssignment[]; keys: RowKey[]; byAllColumns: boolean } & WithCon
+> {}
+export class CountRowsEvent extends Event<
+    { tableName: string; filters: Filter[]; mode?: FilterMode } & WithCon
+> {}
 
 export const SQLEventController = (
     cboard: Electron.Clipboard,
@@ -43,7 +65,24 @@ export const SQLEventController = (
         ser.GetDialectInfo(arg.Data.conID)
     );
     e.handle('run_manual_query', (_, arg: RunManualQueryEvent) =>
-        ser.RunManualQuery(arg.Data.conID, arg.Data.query)
+        ser.RunManualQuery(arg.Data.conID, arg.Data.query, {
+            commitFirst: arg.Data.commitFirst,
+        })
+    );
+    e.handle('begin_transaction', (_, arg: GetDialectInfoEvent) =>
+        ser.BeginTransaction(arg.Data.conID)
+    );
+    e.handle('commit_transaction', (_, arg: GetDialectInfoEvent) =>
+        ser.CommitTransaction(arg.Data.conID)
+    );
+    e.handle('rollback_transaction', (_, arg: GetDialectInfoEvent) =>
+        ser.RollbackTransaction(arg.Data.conID)
+    );
+    e.handle('transaction_state', (_, arg: GetDialectInfoEvent) =>
+        Transactions.info(arg.Data.conID)
+    );
+    e.handle('transaction_log', (_, arg: GetDialectInfoEvent) =>
+        Transactions.log(arg.Data.conID)
     );
     e.handle('show_all_tables', (_, arg: ShowAllTablesEvent) =>
         ser.ShowAllTables(arg.Data.conID)
@@ -82,6 +121,33 @@ export const SQLEventController = (
         let res = await ser.ShowCreateSQL(arg.Data.conID, arg.Data.tableName);
         cboard.writeText(res);
     });
+    e.handle('get_create_sql', (_, arg: ShowCreateTableEvent) =>
+        ser.ShowCreateSQL(arg.Data.conID, arg.Data.tableName)
+    );
+    e.handle('insert_rows', (_, arg: InsertRowsEvent) =>
+        ser.InsertRows(
+            arg.Data.conID,
+            arg.Data.tableName,
+            arg.Data.columns,
+            arg.Data.rows,
+            arg.Data.ignore
+        )
+    );
+    e.handle('delete_rows', (_, arg: DeleteRowsEvent) =>
+        ser.DeleteRows(arg.Data.conID, arg.Data.tableName, arg.Data.keys, arg.Data.byAllColumns)
+    );
+    e.handle('update_rows', (_, arg: UpdateRowsEvent) =>
+        ser.UpdateRows(
+            arg.Data.conID,
+            arg.Data.tableName,
+            arg.Data.set,
+            arg.Data.keys,
+            arg.Data.byAllColumns
+        )
+    );
+    e.handle('count_table_rows', (_, arg: CountRowsEvent) =>
+        ser.CountRows(arg.Data.conID, arg.Data.tableName, arg.Data.filters, arg.Data.mode)
+    );
     e.handle('truncate_table', async (_, arg: TruncateTableEvent) =>
         ser.TruncateTable(arg.Data.conID, arg.Data.tableName)
     );

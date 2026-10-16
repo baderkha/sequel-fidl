@@ -1,83 +1,32 @@
-import { calc } from '@chakra-ui/react';
-import { LinearProgress, Typography } from '@mui/material';
+import React from 'react';
 import { useAtom } from 'jotai';
-import { useEffect, useState } from 'react';
-import { MemoryRouter as Router, Routes, Route } from 'react-router-dom';
-import { CodeEditorIFRAME } from './Components/CodeEditor/CodeEditor';
+import { api, SessionInfo } from './api';
 import { DBView } from './Pages/DB/DB';
-import { DummyConID } from './State';
+import { Welcome } from './Pages/Welcome/Welcome';
+import { SessionState } from './State';
+import { useToast } from './Components/ui/Toasts';
 
-const Hello = ({ loading = true }) => {
-    let [dots, setDots] = useState('.');
-    let [timerId, setTimerId] = useState(null);
-    if (timerId && !loading) {
-        window.clearInterval(timerId);
-    }
-    useEffect(() => {
-        console.log('setting timer');
-        setTimerId(
-            window.setInterval(() => {
-                if (dots == '...') {
-                    dots = '.';
-                } else {
-                    dots += '.';
-                }
-                setDots(dots);
-            }, 1 * 1000)
-        );
-    }, []);
-    if (!loading) {
-        return (
-            <div>
-                <DBView></DBView>
-            </div>
-        );
-    }
-    return (
-        <div
-            style={{
-                display: 'flex',
-                alignContent: 'center',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '100%',
-                minHeight: 'calc(100vh - 16px)',
-            }}
-        >
-            <div
-                style={{
-                    width: '60%',
-                    textAlign: 'center',
-                }}
-            >
-                <LinearProgress></LinearProgress>
-                <Typography
-                    style={{
-                        marginTop: '10px',
-                    }}
-                >
-                    Conecting to Database {dots}
-                </Typography>
-            </div>
-        </div>
-    );
-};
-
+/**
+ * Every window loads this : workspace windows get their session from the main process ,
+ * the launcher has none
+ */
 export default function App() {
-    const [conID, setConID] = useAtom(DummyConID);
-    useEffect(() => {
-        window.electron.ipcRenderer
-            .invoke('init_dummy_playground', {})
-            .then((res) => {
-                setConID(res);
-            });
+    const [session, setSession] = useAtom(SessionState);
+    const [ready, setReady] = React.useState(false);
+    const notify = useToast();
+
+    React.useEffect(() => {
+        api.windowSession().then((s) => {
+            setSession(s);
+            setReady(true);
+        });
     }, []);
-    return (
-        <Router>
-            <Routes>
-                <Route path="/" element={<Hello loading={!conID} />} />
-            </Routes>
-            <Routes></Routes>
-        </Router>
-    );
+
+    const openWorkspace = (s: SessionInfo) =>
+        api.openWorkspace(s.conID).then((err) => err && notify(err.message, 'error'));
+
+    if (!ready) {
+        return null;
+    }
+    return session ? <DBView /> : <Welcome onConnected={openWorkspace} />;
 }

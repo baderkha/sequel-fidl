@@ -1,68 +1,87 @@
 import { ErrorTuple } from '../../util/tuple';
-import { Sequelize } from 'sequelize';
+import { Dialect, Sequelize } from 'sequelize';
 import { DBType } from '../../model/Connections';
 
-const CONNECTION_TRY_BEFORE_TIMEOUT_SECONDS = 60 * 1000;
+const CONNECTION_TRY_BEFORE_TIMEOUT_MS = 60 * 1000;
+const RETRY_EVERY_MS = 1000;
 
-export const waitTillConnection = async (con: Sequelize): Promise<Error> => {
-    let msElapsed = 0;
-    return new Promise((res) => {
-        let itvl = setInterval(async () => {
-            // every second try for connection
-            if (msElapsed >= CONNECTION_TRY_BEFORE_TIMEOUT_SECONDS) {
-                clearInterval(itvl);
-                console.log('connection_factory', 'timed out :(');
-                res(new Error(`Connection retry has exceeded timeout`));
+export type ConnectionConfig = {
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    /** empty => no default database */
+    database?: string;
+};
+
+/**
+ * Poll the connection until it answers or the timeout passes
+ * @param con
+ * @param timeoutMs 0 => a single attempt
+ * @param onRetry called before every retry
+ */
+export const waitTillConnection = async (
+    con: Sequelize,
+    timeoutMs = CONNECTION_TRY_BEFORE_TIMEOUT_MS,
+    onRetry?: (elapsedMs: number) => void
+): Promise<Error> => {
+    const started = Date.now();
+    for (;;) {
+        try {
+            await con.query('select 1');
+            return null;
+        } catch (err) {
+            const elapsed = Date.now() - started;
+            if (elapsed >= timeoutMs) {
+                return timeoutMs > 0
+                    ? new Error(
+                          `Timed out after ${Math.round(elapsed / 1000)}s: ${
+                              (err as Error).message
+                          }`
+                      )
+                    : (err as Error);
             }
-            await con
-                .query('select 1')
-                .then((data) => {
-                    console.log('connection_factory', 'got connection !', data);
-                    clearInterval(itvl);
-                    res(null);
-                })
-                .catch(() => {
-                    console.log(
-                        'connection_factory',
-                        'retrying ...',
-                        msElapsed / 1000,
-                        's'
-                    );
-                    msElapsed += 1000;
-                });
-        }, 1000);
-    });
+            onRetry && onRetry(elapsed);
+            await new Promise((r) => setTimeout(r, RETRY_EVERY_MS));
+        }
+    }
 };
 
 /**
  * Async Create a connection after making
  * sure it's actually ready to process sql commands
  * @param type
- * @param opts
+ * @param cfg
+ * @param timeoutMs how long to keep retrying (playgrounds need time to boot) , 0 => fail fast
+ * @param onRetry
  */
 export const CreateConnection = async (
     type: DBType,
-    opts: Map<string, string>
+    cfg: ConnectionConfig,
+    timeoutMs = CONNECTION_TRY_BEFORE_TIMEOUT_MS,
+    onRetry?: (elapsedMs: number) => void
 ): Promise<ErrorTuple<Sequelize>> => {
-    let connectionString: string = '';
-    let host = opts.get('host');
-    host = host ? host : '127.0.0.1';
-    switch (type) {
-        case 'mysql':
-            connectionString = `mysql://${opts.get('user_name')}:${opts.get(
-                'password'
-            )}@${host}:${opts.get('port')}/${opts.get(
-                'default_db'
-            )}?multipleStatements=true`;
-            break;
-        default:
-            return Promise.resolve([
-                null,
-                new Error('Unsupported Database Type'),
-            ]);
+    if (type !== 'mysql') {
+        return [null, new Error('Unsupported Database Type')];
     }
-    const con = new Sequelize(connectionString);
-    console.log('connection factory', 'waiting till conneciton');
-    let err = await waitTillConnection(con);
-    return err ? [null, err] : [con, null];
+    const con = new Sequelize(cfg.database || '', cfg.username, cfg.password, {
+        host: cfg.host || '127.0.0.1',
+        port: cfg.port,
+        dialect: type as Dialect,
+        logging: false,
+        pool: { max: 5, min: 0, idle: 10000 },
+        dialectOptions: {
+            multipleStatements: true,
+            connectTimeout: 10000,
+            // keep DECIMAL / BIGINT precision
+            supportBigNumbers: true,
+            dateStrings: false,
+        },
+    });
+    const err = await waitTillConnection(con, timeoutMs, onRetry);
+    if (err) {
+        await con.close().catch(() => {});
+        return [null, err];
+    }
+    return [con, null];
 };

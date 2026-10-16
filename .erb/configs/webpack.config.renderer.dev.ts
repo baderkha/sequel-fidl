@@ -7,6 +7,7 @@ import chalk from 'chalk';
 import { merge } from 'webpack-merge';
 import { execSync, spawn } from 'child_process';
 import ReactRefreshWebpackPlugin from '@pmmmwh/react-refresh-webpack-plugin';
+import MonacoWebpackPlugin from 'monaco-editor-webpack-plugin';
 import baseConfig from './webpack.config.base';
 import webpackPaths from './webpack.paths';
 import checkNodeEnv from '../scripts/check-node-env';
@@ -81,7 +82,13 @@ const configuration: webpack.Configuration = {
       {
         test: /\.s?css$/,
         use: ['style-loader', 'css-loader', 'sass-loader'],
-        exclude: /\.module\.s?(c|a)ss$/,
+        exclude: [/\.module\.s?(c|a)ss$/, /node_modules/],
+      },
+      // Plain css shipped by packages (monaco) , skip sass
+      {
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader'],
+        include: /node_modules/,
       },
       // Fonts
       {
@@ -148,6 +155,8 @@ const configuration: webpack.Configuration = {
     }),
 
     new ReactRefreshWebpackPlugin(),
+
+    new MonacoWebpackPlugin({ languages: ['mysql', 'sql'] }),
 
     new HtmlWebpackPlugin({
       filename: path.join('index.html'),

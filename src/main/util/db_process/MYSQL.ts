@@ -1,12 +1,13 @@
-import { IDocker } from '../docker/DockerRunner';
+import { ContainerState, IDocker } from '../docker/DockerRunner';
 import { BaseDockerDB } from './BaseDockerDB';
 import {
+    DBProcStartOptions,
     DBProcStartOut,
     DBProcTpl,
     DEFAULT_GENERATED_DB_NAME,
     IDBProcess,
 } from '../../util/db_process';
-import { rmdirSync } from 'fs';
+import { mkdirSync, rmSync } from 'fs';
 import { UNEXPECTED_ERROR_LOG } from '../pubsub';
 import { ipcMain } from 'electron';
 
@@ -27,30 +28,45 @@ export class MYSQLDocker extends BaseDockerDB implements IDBProcess {
         this.rootPwddefault = rootPwdDefault;
     }
 
-    async StartUp(version: string): Promise<DBProcTpl> {
-        const id = this.generateContainerId();
-        const path = this.getAppContainerPath(id);
-        return this.StartUpFromExisting(path, version, id);
+    IsAvailable(): Promise<boolean> {
+        return this.docker.Ping();
     }
 
+    State(processID: string): Promise<ContainerState> {
+        return this.docker.ContainerState(processID);
+    }
+
+    async StartUp(version: string, opts?: DBProcStartOptions): Promise<DBProcTpl> {
+        const id = this.generateContainerId();
+        const path = this.getAppContainerPath(id);
+        return this.StartUpFromExisting(path, version, id, opts);
+    }
+
+    /**
+     * Start mysql on a data folder , the container is disposable : any old container with
+     * the same name is removed and a new one is created on a free port
+     */
     async StartUpFromExisting(
         dataPath: string,
         version: string,
-        containerID?: string
+        containerID?: string,
+        opts: DBProcStartOptions = {}
     ): Promise<DBProcTpl> {
         containerID = containerID ? containerID : this.generateContainerId();
+        await this.docker.RemoveContainer(containerID);
+        mkdirSync(dataPath, { recursive: true });
         const port = await this.getFreePort();
         const [_, err] = await this.docker.RunImage('mysql', {
+            Labels: opts.labels,
+            OnProgress: opts.onProgress,
             ImageVersion: version,
             PortInPortOut: [port, 3306],
             VolumeBinding: [dataPath, this.DbVolume],
             CustomContainerID: containerID,
-            ExtraArgs: [
-                '-e',
-                `MYSQL_ROOT_PASSWORD=${this.rootPwddefault}`,
-                '-e',
-                `MYSQL_DATABASE=${DEFAULT_GENERATED_DB_NAME}`,
-            ],
+            EnvVarsMap: new Map([
+                ['MYSQL_ROOT_PASSWORD', this.rootPwddefault],
+                ['MYSQL_DATABASE', DEFAULT_GENERATED_DB_NAME],
+            ]),
         });
 
         const out: DBProcStartOut = {
@@ -70,15 +86,58 @@ export class MYSQLDocker extends BaseDockerDB implements IDBProcess {
         processID: string,
         statePathToDelete?: string
     ): Promise<boolean> {
+        // graceful stop so mysql flushes its data to the volume , then drop the container
+        await this.docker.StopContainer(processID, 20);
+        const removed = await this.docker.RemoveContainer(processID);
         if (statePathToDelete) {
             await this.DeleteState(statePathToDelete);
         }
-        return this.docker.KillContainer(processID);
+        return removed;
+    }
+
+    async ImportArchive(
+        processID: string,
+        archivePath: string,
+        sqlFiles: string[],
+        dropDatabase?: string
+    ): Promise<Error> {
+        const dir = '/tmp/sequel-fidl-import';
+        const mysql = (args: string) =>
+            this.docker.Exec(processID, [
+                'sh',
+                '-c',
+                `MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot ${args}`,
+            ]);
+        const fail = (stderr: string) =>
+            new Error(stderr.replace(/^mysql: \[Warning\].*\n?/gm, '').trim() || 'import failed');
+        try {
+            await this.docker.Exec(processID, ['mkdir', '-p', dir]);
+            const err = await this.docker.CopyArchiveInto(processID, archivePath, dir);
+            if (err) {
+                return err;
+            }
+            if (dropDatabase) {
+                const res = await mysql(`-e 'DROP DATABASE IF EXISTS \`${dropDatabase}\`'`);
+                if (res.exitCode !== 0) {
+                    return fail(res.stderr);
+                }
+            }
+            for (const file of sqlFiles) {
+                const res = await mysql(`< '${dir}/${file}'`);
+                if (res.exitCode !== 0) {
+                    return fail(res.stderr);
+                }
+            }
+            await this.docker.Exec(processID, ['rm', '-rf', dir]);
+            return null;
+        } catch (err) {
+            return err as Error;
+        }
     }
 
     DeleteState(statePathToDelete: string): Promise<void> {
         try {
-            rmdirSync(statePathToDelete);
+            rmSync(statePathToDelete, { recursive: true, force: true });
         } catch (err) {
             const msg = `unexpected folder delete err ${err}`;
             ipcMain.emit(UNEXPECTED_ERROR_LOG, msg);

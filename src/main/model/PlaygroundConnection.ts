@@ -9,6 +9,14 @@ export interface PlayGroundConnectionItems extends PlaygroundConnection {}
  * @author Ahmad Baderkhan
  */
 export class PlaygroundConnection extends SqlizeModelIndexed {
+    declare name: string;
+    /** docker container name , the container itself is disposable */
+    declare containerName: string;
+    declare lastUsedAt: Date;
+    /** sample database to import on first start ('' => none) */
+    declare sample: string;
+    /** the sample was imported */
+    declare seeded: boolean;
     declare type: DBType;
     declare version: string;
     declare sandboxFolderPath: string;
@@ -19,6 +27,23 @@ export class PlaygroundConnection extends SqlizeModelIndexed {
 
     constructor() {
         super('playground_connections', {
+            name: {
+                type: DataTypes.STRING,
+            },
+            containerName: {
+                type: DataTypes.STRING,
+            },
+            lastUsedAt: {
+                type: DataTypes.DATE,
+            },
+            sample: {
+                type: DataTypes.STRING,
+                defaultValue: '',
+            },
+            seeded: {
+                type: DataTypes.BOOLEAN,
+                defaultValue: false,
+            },
             type: {
                 type: DataTypes.STRING,
             },

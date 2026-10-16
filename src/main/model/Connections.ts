@@ -9,6 +9,7 @@ export type DBType = Dialect;
  * @author Ahmad Baderkhan
  */
 export class Connection extends SqlizeModelIndexed {
+    declare name: string;
     declare username: string;
     declare password: string;
     declare host: string;
@@ -17,6 +18,9 @@ export class Connection extends SqlizeModelIndexed {
     declare type: DBType;
     constructor() {
         super('connections', {
+            name: {
+                type: DataTypes.STRING,
+            },
             username: {
                 type: DataTypes.STRING,
             },
