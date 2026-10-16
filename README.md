@@ -15,7 +15,7 @@ I will admit I did use AI as it does a better job of cranking out the front end 
 
 <p align="center"> <img src="./assets/logo.png" /> </p>
 
-A desktop MySQL client in the spirit of Sequel Pro, with a modern dark UI. Connect to any MySQL server, or spin up a throwaway **playground** in Docker with one click: a real MySQL with sample data, which stops when you close its window.
+A desktop MySQL client in the spirit of Sequel Pro, with a modern dark UI and a playground for brainstorming ideas.
 
 ![Browsing the sakila sample: filtered rows with a bulk action bar](docs/screenshots/content.png)
 
