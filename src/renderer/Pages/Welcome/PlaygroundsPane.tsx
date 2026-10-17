@@ -51,6 +51,7 @@ export function PlaygroundsPane({ onConnected }: { onConnected: (s: SessionInfo)
     const [docker, setDocker] = React.useState<boolean | null>(null);
     const [selected, setSelected] = React.useState<number | 'new'>('new');
     const [name, setName] = React.useState('');
+    const [customPort,setCustomPort] = React.useState(null);
     const [version, setVersion] = React.useState('8.4');
     const [custom, setCustom] = React.useState('');
     const [sample, setSample] = React.useState('');
@@ -117,7 +118,7 @@ export function PlaygroundsPane({ onConnected }: { onConnected: (s: SessionInfo)
             return;
         }
         setError('');
-        api.createPlayground({ name: name.trim(), version: tag, sample }).then(([pg, err]) => {
+        api.createPlayground({ name: name.trim(), version: tag, sample,port : customPort }).then(([pg, err]) => {
             if (err) {
                 setError(err.message);
                 return;
@@ -226,6 +227,8 @@ export function PlaygroundsPane({ onConnected }: { onConnected: (s: SessionInfo)
                             <dd>{current.connected ? 'Open' : 'None'}</dd>
                             <dt>Version</dt>
                             <dd>MySQL {current.version}</dd>
+                            <dd>Port</dd>
+                            <dd>{current.port}</dd>
                             <dt>Login</dt>
                             <dd className="mono">root / root · {current.database}</dd>
                             {current.sample && (
@@ -324,6 +327,18 @@ export function PlaygroundsPane({ onConnected }: { onConnected: (s: SessionInfo)
                                     onChange={(ev) => setName(ev.target.value)}
                                 />
                             </label>
+
+                            <label className="field span-2">
+                                <span className="field-label">Reserved Port</span>
+                                <input
+                                    className="app-input"
+                                    autoFocus
+                                    value={customPort}
+                                    placeholder={`automatically generated`}
+                                    onChange={(ev) => setCustomPort(ev.target.value)}
+                                />
+                            </label>
+                            
                             <label className="field">
                                 <span className="field-label">Version</span>
                                 <select

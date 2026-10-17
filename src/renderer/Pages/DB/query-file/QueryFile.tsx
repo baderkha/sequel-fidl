@@ -243,7 +243,7 @@ export const QueryFile = (q: QueryFileProps) => {
     if (q.mode === 'project' && !q.worksheets.folder) {
         return <ProjectFolderPicker ws={q.worksheets} label={q.label} />;
     }
-
+    const shouldNotRunQuery = running ||( sheet.name.indexOf(".sql")<=0 && q.mode != "quick");
     return (
         <div className="view">
             {q.mode === 'quick' ? (
@@ -300,7 +300,7 @@ export const QueryFile = (q: QueryFileProps) => {
                     type="button"
                     className="btn is-primary"
                     onClick={runCurrent}
-                    disabled={running}
+                    disabled={shouldNotRunQuery}
                     title="Run the selection or the statement under the cursor"
                 >
                     <Play size={12} fill="currentColor" /> Run <kbd>⌘↵</kbd>
@@ -309,7 +309,7 @@ export const QueryFile = (q: QueryFileProps) => {
                     type="button"
                     className="btn"
                     onClick={runAll}
-                    disabled={running}
+                    disabled={shouldNotRunQuery}
                     title="Run every statement"
                 >
                     Run All <kbd>⌘⇧↵</kbd>

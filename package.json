@@ -114,7 +114,7 @@
     "@json2csv/plainjs": "^6.1.2",
     "@org-formation/tombok": "^0.0.1",
     "@tanstack/react-virtual": "^3.14.19",
-    "axios": "^0.27.2",
+    "axios": "^1.7.9",
     "axios-debug-log": "^1.0.0",
     "electron-debug": "^3.2.0",
     "electron-log": "^4.4.8",

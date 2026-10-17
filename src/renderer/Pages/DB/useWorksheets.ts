@@ -69,6 +69,7 @@ export function useWorksheets(scope: string) {
     const [quick, setQuick] = React.useState<WorksheetInfo | null>(null);
     const [tabs, setTabs] = React.useState<Tabs>({ open: [], active: null });
     const [pendingIds, setPendingIds] = React.useState<Set<string>>(new Set());
+    const [previewRel, setPreviewRel] = React.useState<string | null>(null);
     const [loaded, setLoaded] = React.useState(false);
     const timers = React.useRef(new Map<string, number>());
     const pending = React.useRef(new Map<string, string>());
@@ -192,12 +193,8 @@ export function useWorksheets(scope: string) {
         return { id, rel, name: baseName(rel), sql: contents[rel], quick: false };
     };
 
-    /** open a project file (text files in the editor , others in their default app) */
+    /** open a project file (text files in the editor , others in the in-app previewer) */
     const openFile = async (rel: string) => {
-        if (!TEXT_FILE.test(rel)) {
-            await api.openExternally(scope, rel);
-            return null;
-        }
         if (contentsRef.current[rel] === undefined) {
             const err = await loadFile(rel);
             if (err) return err;
@@ -354,6 +351,10 @@ export function useWorksheets(scope: string) {
         activeId: tabs.active,
         isDirty: (d: Doc) => pendingIds.has(d.id),
         absPath: (rel: string) => (folder ? `${folder}/${rel}` : rel),
+        previewRel,
+        setPreviewRel,
+        previewFile: (rel: string) => setPreviewRel(rel),
+        closePreview: () => setPreviewRel(null),
         openFile,
         open,
         close,

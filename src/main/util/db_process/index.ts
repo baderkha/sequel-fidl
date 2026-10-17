@@ -43,6 +43,7 @@ export interface IDBProcess {
         dataPath: string,
         version: string,
         processID?: string,
+        customPort? : string | number,
         opts?: DBProcStartOptions
     ): Promise<DBProcTpl>;
     /**

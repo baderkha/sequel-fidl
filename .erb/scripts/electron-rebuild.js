@@ -8,13 +8,19 @@ if (
   fs.existsSync(webpackPaths.appNodeModulesPath)
 ) {
   const electronRebuildCmd =
-    '../../node_modules/.bin/electron-rebuild --force --types prod,dev,optional --module-dir .';
+    '../../node_modules/.bin/electron-rebuild --types prod,dev --module-dir .';
   const cmd =
     process.platform === 'win32'
       ? electronRebuildCmd.replace(/\//g, '\\')
       : electronRebuildCmd;
-  execSync(cmd, {
-    cwd: webpackPaths.appPath,
-    stdio: 'inherit',
-  });
+  try {
+    execSync(cmd, {
+      cwd: webpackPaths.appPath,
+      stdio: 'inherit',
+    });
+  } catch (e) {
+    console.warn(
+      'electron-rebuild skipped or encountered an error (compiler tools may not be installed). Continuing with prebuilt native binaries...'
+    );
+  }
 }

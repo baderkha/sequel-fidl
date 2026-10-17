@@ -3,6 +3,8 @@ import {
     ChevronDown,
     ChevronRight,
     Copy,
+    ExternalLink,
+    Eye,
     File,
     FileCode2,
     FilePlus2,
@@ -17,7 +19,7 @@ import {
     SquareTerminal,
     Trash2,
 } from 'lucide-react';
-import type { FsEntry } from 'renderer/api';
+import { api, FsEntry } from 'renderer/api';
 import { ContextMenu, MenuEntry, useContextMenu } from 'renderer/Components/ui/ContextMenu';
 import { Modal } from 'renderer/Components/ui/Modal';
 import { useToast } from 'renderer/Components/ui/Toasts';
@@ -109,9 +111,14 @@ export function useExplorer({ ws, scope, label, onShowEditor, onOpenTerminal }: 
     };
 
     const openEntry = async (entry: FsEntry) => {
+        if (!TEXT_FILE.test(entry.rel)) {
+            // Avoid opening other apps! Open in the in-app previewer
+            ws.previewFile(entry.rel);
+            return;
+        }
         const err = await ws.openFile(entry.rel);
         report(err);
-        if (!err && TEXT_FILE.test(entry.rel)) onShowEditor();
+        if (!err) onShowEditor();
     };
 
     // ---- drag & drop : inside the tree = move , from Finder = copy
@@ -155,7 +162,22 @@ export function useExplorer({ ws, scope, label, onShowEditor, onOpenTerminal }: 
                   { label: 'New Folder', icon: <FolderPlus size={14} />, onSelect: () => startNew('new-folder', e.rel) },
                   'separator',
               ]
-            : [{ label: 'Open', icon: <FileCode2 size={14} />, onSelect: () => openEntry(e) }, 'separator']) as MenuEntry[]),
+            : [
+                  ...(TEXT_FILE.test(e.name)
+                      ? [
+                            { label: 'Open in Editor', icon: <FileCode2 size={14} />, onSelect: () => openEntry(e) },
+                            { label: 'Preview', icon: <Eye size={14} />, onSelect: () => ws.previewFile(e.rel) },
+                        ]
+                      : [
+                            { label: 'Preview', icon: <Eye size={14} />, onSelect: () => ws.previewFile(e.rel) },
+                            {
+                                label: 'Open in Default App',
+                                icon: <ExternalLink size={14} />,
+                                onSelect: () => api.openExternally(scope, e.rel),
+                            },
+                        ]),
+                  'separator',
+              ]) as MenuEntry[]),
         { label: 'Reveal in Finder', icon: <FolderSearch size={14} />, onSelect: () => ws.reveal(e.rel) },
         {
             label: 'Open in Terminal',

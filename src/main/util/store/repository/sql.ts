@@ -1,6 +1,6 @@
 import { NewTuple, Tuple } from '../../tuple';
-import { Sequelize } from 'sequelize';
-import { Index, MultiIndex, Repository } from '.';
+import { Sequelize,Op } from 'sequelize';
+import { ComparisonOperation, Condition, Index, MultiIndex, Repository } from '.';
 import { IBaseModel } from '../model';
 
 /**
@@ -20,6 +20,13 @@ export class BaseSQLRepository<T extends IBaseModel> implements Repository<T> {
         this.expectedKeys = this.primaryKeys.sort().join(',');
 
         this.con = con;
+    }
+    FindManyByCondition(i: Array<Condition>): Promise<T[]> {
+        const val =  this.conditionToSQLZ(i);
+        console.log(val)
+        return this.getDb().findAll({
+            where : val
+        }) as unknown as Promise<T[]>
     }
     FindAll(): Promise<T[]> {
         return this.getDb().findAll() as unknown as Promise<T[]>;
@@ -71,6 +78,41 @@ export class BaseSQLRepository<T extends IBaseModel> implements Repository<T> {
             )
             .then(() => null)
             .catch((err) => err);
+    }
+    private conditionToSQLZ(i: Array<Condition>) : Record<string,any> {
+        let finalObj: Record<string, any> = {}
+       for (let index = 0; index <i.length; index++ ){
+        let seqlzOp;
+        switch (i[index].op) {
+            case ComparisonOperation.GT : {
+                seqlzOp = Op.gt
+                break;
+            }
+            case ComparisonOperation.LT : {
+                seqlzOp = Op.lt
+                break;
+            }
+            case ComparisonOperation.NE : {
+                seqlzOp = Op.ne
+                break;
+            }
+        }
+        if (seqlzOp) {
+             finalObj[i[index].col] = {
+            [seqlzOp] : i[index].value
+         }
+        } else {
+            finalObj[i[index].col] = i[index].value
+        }
+       
+       }
+       return finalObj;
+    }
+
+    DeleteByCondition(i: Array<Condition>): Promise<Error> {
+        return this.getDb().destroy({
+            where:this.conditionToSQLZ(i)
+        }).then(()=>null).catch((err)=>err)
     }
     DeleteByIndex(i: Index<T>): Promise<Error> {
         this.validateIndex(i);

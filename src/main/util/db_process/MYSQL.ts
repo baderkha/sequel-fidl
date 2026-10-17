@@ -50,12 +50,13 @@ export class MYSQLDocker extends BaseDockerDB implements IDBProcess {
         dataPath: string,
         version: string,
         containerID?: string,
+        customPort? : string | number,
         opts: DBProcStartOptions = {}
     ): Promise<DBProcTpl> {
         containerID = containerID ? containerID : this.generateContainerId();
         await this.docker.RemoveContainer(containerID);
         mkdirSync(dataPath, { recursive: true });
-        const port = await this.getFreePort();
+        const port = customPort ? (typeof customPort == "string" ? parseInt(customPort,10) : customPort) : await this.getFreePort();
         const [_, err] = await this.docker.RunImage('mysql', {
             Labels: opts.labels,
             OnProgress: opts.onProgress,

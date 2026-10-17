@@ -15,6 +15,7 @@ import { ConManager } from './Connections';
 import { CreateConnection } from './db/ConnectionFactory';
 import { SessionInfo, Sessions } from './Sessions';
 import { fetchSample, getSample } from './samples';
+import { ComparisonOperation } from '../util/store/repository';
 
 /** where playground data folders live , owned by the app */
 export const PLAYGROUNDS_PATH = path.join(BASE_APP_DATA_PATH, 'playgrounds');
@@ -53,6 +54,7 @@ export type NewPlaygroundInput = {
     version: string;
     /** sample database to import on first start */
     sample?: string;
+    port? : number
 };
 
 /**
@@ -150,6 +152,16 @@ export class PlaygroundService {
     async Create(input: NewPlaygroundInput): Promise<ErrorTuple<PlaygroundInfo>> {
         const key = v4();
         try {
+            let res = await this.repo.FindAll();
+            console.log(res.length ? res[0] : null)
+            const val = await this.repo.FindManyByCondition([{
+                col : "port",
+                op : ComparisonOperation.EQ,
+                value : input.port
+            }])
+            if (val.length > 0) {
+                return NewErrorTuple(null,new Error(`This port is already taken by Playground:"${val[0].name}"`,));
+            }
             const row: any = await this.repo.getDb().create({
                 name: input.name.trim() || `MySQL ${input.version}`,
                 type: 'mysql',
@@ -158,11 +170,14 @@ export class PlaygroundService {
                 sandboxFolderPath: path.join(PLAYGROUNDS_PATH, key),
                 username: 'root',
                 password: encryptSecret('root'),
-                port: 0,
+                port: input.port ? input.port : 0,
                 defaultDB: DEFAULT_GENERATED_DB_NAME,
                 sample: getSample(input.sample || '') ? input.sample : '',
                 seeded: false,
             });
+
+            console.log(row)
+
             return NewErrorTuple(
                 await this.info(row.get({ plain: true }) as PlaygroundConnection),
                 null
@@ -206,6 +221,7 @@ export class PlaygroundService {
                     pg.sandboxFolderPath,
                     pg.version,
                     pg.containerName,
+                    pg.port,
                     {
                         labels: { [PLAYGROUND_LABEL]: `${id}` },
                         onProgress: (msg) => this.progress(id, msg),
