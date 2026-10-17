@@ -16,6 +16,7 @@ import { CreateConnection } from './db/ConnectionFactory';
 import { SessionInfo, Sessions } from './Sessions';
 import { fetchSample, getSample } from './samples';
 import { ComparisonOperation } from '../util/store/repository';
+const dockerNames = require('docker-names');
 
 /** where playground data folders live , owned by the app */
 export const PLAYGROUNDS_PATH = path.join(BASE_APP_DATA_PATH, 'playgrounds');
@@ -145,6 +146,10 @@ export class PlaygroundService {
         );
     }
 
+    generateRandomName(version: string) : string {
+        return `${dockerNames.getRandomName().replaceAll("_","-")}-${version}`
+    }
+
     /**
      * Register a new playground (nothing is started until it's opened)
      * @param input
@@ -163,7 +168,7 @@ export class PlaygroundService {
                 return NewErrorTuple(null,new Error(`This port is already taken by Playground:"${val[0].name}"`,));
             }
             const row: any = await this.repo.getDb().create({
-                name: input.name.trim() || `MySQL ${input.version}`,
+                name: input.name.trim() || this.generateRandomName(input.version.trim()),
                 type: 'mysql',
                 version: input.version.trim() || 'latest',
                 containerName: `sequel-fidl-pg-${key}`,

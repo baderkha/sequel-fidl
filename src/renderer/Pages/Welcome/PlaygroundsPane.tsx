@@ -13,6 +13,7 @@ import {
 import { api, onMainEvent, PlaygroundInfo, SessionInfo } from 'renderer/api';
 import { Modal } from 'renderer/Components/ui/Modal';
 import { useToast } from 'renderer/Components/ui/Toasts';
+import dockerNames from 'docker-names'
 
 const VERSIONS = [
     { tag: '8.4', label: 'MySQL 8.4 (LTS)' },
@@ -50,7 +51,7 @@ export function PlaygroundsPane({ onConnected }: { onConnected: (s: SessionInfo)
     const [loaded, setLoaded] = React.useState(false);
     const [docker, setDocker] = React.useState<boolean | null>(null);
     const [selected, setSelected] = React.useState<number | 'new'>('new');
-    const [name, setName] = React.useState('');
+   
     const [customPort,setCustomPort] = React.useState(null);
     const [version, setVersion] = React.useState('8.4');
     const [custom, setCustom] = React.useState('');
@@ -63,7 +64,8 @@ export function PlaygroundsPane({ onConnected }: { onConnected: (s: SessionInfo)
     const [confirmDelete, setConfirmDelete] = React.useState<PlaygroundInfo | null>(null);
     const [renaming, setRenaming] = React.useState<PlaygroundInfo | null>(null);
     const [renameTo, setRenameTo] = React.useState('');
-
+    
+     const [name, setName] = React.useState(`${dockerNames.getRandomName().replaceAll("_","-")}-${version}`);
     const refresh = React.useCallback(() => {
         api.dockerAvailable().then(setDocker);
         return api.listPlaygrounds().then((l) => {
