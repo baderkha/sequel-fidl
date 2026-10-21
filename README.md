@@ -66,6 +66,8 @@ The launcher is the first window you see. Every connection opens in its own wind
   - **Duplicate** rows;
   - **Copy** as SQL `INSERT`, CSV, TSV (pastes into spreadsheets) or JSON;
   - **Delete** (⌫). Every change shows its SQL before it runs.
+- **Double-click a cell** to edit it or select text to copy. Leave it unchanged to close the editor, or change it and leave the cell to review **Before**, **After** and the SQL before confirming the update. Enter reviews a change; Escape discards it.
+- Switch **Table / JSON** in Content to browse rows as document cards. Nested objects and arrays start collapsed; expand individual fields and hover for JSON types and SQL column details. Each card has copy, edit and delete actions. JSON edits show a field-by-field before/after comparison and SQL before saving, and the selected view is remembered.
 - Table actions from the sidebar's right-click menu: copy the `CREATE` statement, duplicate, rename, truncate, drop, seed, export.
 - Switch databases from the sidebar, and filter the table list by name.
 
@@ -214,6 +216,8 @@ yarn start
 If you run it from VS Code's integrated terminal, clear `ELECTRON_RUN_AS_NODE` first, or Electron starts as plain Node: `env -u ELECTRON_RUN_AS_NODE yarn start`.
 
 Build a packaged app with `yarn package`.
+
+The install step builds native modules for Electron, so macOS needs the Xcode Command Line Tools (`xcode-select --install`). The `postinstall` command supplies C++17 and `npm_config_dist_url` so both Yarn and npm use Electron's headers when compiling native modules with Node 24.
 
 ## Where your data lives
 

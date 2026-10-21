@@ -584,6 +584,9 @@ body.is-resizing * {
     text-overflow: ellipsis;
 }
 .grid-hcell-type {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
     color: var(--text-faint);
     font-weight: 400;
     font-size: 11px;
@@ -693,6 +696,33 @@ body.is-resizing * {
 .grid-cell.is-active {
     box-shadow: inset 0 0 0 1.5px var(--accent);
     border-radius: 2px;
+}
+.grid-cell.is-editing {
+    padding: 0;
+    overflow: visible;
+    position: relative;
+    z-index: 2;
+}
+.grid-row.is-editing {
+    z-index: 2;
+}
+.grid-cell-editor {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    min-height: 24px;
+    max-height: 160px;
+    padding: 3px 10px;
+    border: 1px solid var(--accent);
+    border-radius: 2px;
+    outline: none;
+    resize: vertical;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    line-height: 18px;
+    white-space: pre;
+    user-select: text;
 }
 .grid-empty {
     position: absolute;
@@ -2090,6 +2120,191 @@ fieldset.ct-row:disabled {
     display: flex;
     flex-direction: column;
 }
+.content-view-toggle {
+    display: inline-flex;
+    flex-shrink: 0;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-sunken);
+}
+.content-view-toggle button {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+}
+.content-view-toggle button[aria-pressed='true'] {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+.document-view {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+.document-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-bottom: 1px solid var(--border);
+}
+.document-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    position: relative;
+    background: var(--surface-sunken);
+}
+.document-list {
+    position: relative;
+    width: 100%;
+}
+.document-item {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 8px 12px 0;
+}
+.record-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.record-card:hover {
+    border-color: var(--border-strong);
+}
+.record-card-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    min-height: 30px;
+    border-bottom: 1px solid var(--border);
+    background: var(--grid-header);
+}
+.record-number {
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+.record-identity {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+}
+.record-card-header .btn {
+    min-height: 22px;
+    height: 22px;
+    padding: 0 6px;
+    font-size: 11px;
+}
+.record-card-header .is-danger {
+    color: var(--danger);
+}
+.json-tree {
+    padding: 4px 0;
+    font: 12px/22px var(--font-mono);
+    user-select: text;
+}
+.json-field {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    min-height: 22px;
+    padding: 0 10px;
+    white-space: pre;
+}
+.json-field:hover {
+    background: var(--hover);
+}
+.json-disclosure {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    flex: 0 0 16px;
+    width: 16px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+}
+button.json-disclosure {
+    cursor: pointer;
+}
+.json-key {
+    color: var(--syntax-identifier);
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+}
+.json-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.json-value.is-string { color: var(--syntax-string); }
+.json-value.is-number { color: var(--syntax-number); }
+.json-value.is-boolean { color: var(--syntax-keyword); }
+.json-value.is-null { color: var(--null-text); }
+.json-count, .json-punctuation { color: var(--text-faint); }
+.json-count {
+    flex-shrink: 0;
+    padding-left: 8px;
+    font: 11px var(--font-ui);
+}
+.document-empty {
+    padding: 40px;
+    text-align: center;
+    color: var(--text-faint);
+}
+.record-json-editor {
+    width: 100%;
+    min-height: 300px;
+    height: 40vh;
+    resize: vertical;
+    white-space: pre;
+    font: 12px/20px var(--font-mono);
+    user-select: text;
+}
+.record-change-heading, .record-change {
+    display: grid;
+    grid-template-columns: minmax(70px, .7fr) minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    padding: 8px;
+    border-bottom: 1px solid var(--border);
+}
+.record-change-heading {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+}
+.record-change pre {
+    margin: 0;
+    max-height: 160px;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font: 12px/18px var(--font-mono);
+    user-select: text;
+}
 .assign-row {
     display: grid;
     grid-template-columns: minmax(0, 1.2fr) 130px minmax(0, 1.4fr) 26px;
@@ -2102,6 +2317,36 @@ fieldset.ct-row:disabled {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
+}
+.cell-change-comparison {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin: 0;
+}
+.cell-change-comparison > div {
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.cell-change-comparison dt {
+    padding: 8px 10px;
+    background: var(--grid-header);
+    font-weight: 600;
+}
+.cell-change-comparison dd {
+    margin: 0;
+}
+.cell-change-comparison pre {
+    margin: 0;
+    padding: 10px;
+    max-height: 180px;
+    overflow: auto;
+    font-family: var(--font-mono);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    user-select: text;
 }
 
 /* ---------- transactions ---------- */
