@@ -1,3 +1,5 @@
+import { DialectContext } from 'renderer/database/DialectContext';
+import { DATABASES, databaseType } from 'shared/db/dialects';
 import React from 'react';
 import { useAtom } from 'jotai';
 import {
@@ -39,7 +41,8 @@ import { BatchExportDialog } from 'renderer/Components/Export/BatchExportDialog'
 import type { TerminalProfileId } from 'renderer/api';
 import { CreateTableWizard } from 'renderer/Components/CreateTable/CreateTableWizard';
 import { SeedDialog } from 'renderer/Components/Seed/SeedDialog';
-import { loadTableDef } from 'renderer/Components/CreateTable/loadTable';
+import { tableDefFromMetadata } from 'renderer/Components/CreateTable/loadTable';
+import { postgresTableDef } from 'renderer/Components/CreateTable/postgres';
 import type { Tab as EditorTab, TableDef } from 'renderer/Components/CreateTable/model';
 import { useTheme } from 'renderer/theme/ThemeProvider';
 
@@ -145,7 +148,7 @@ export function DBView() {
             onMainEvent('menu_open_folder', () => worksheets.chooseFolder(label).then(reportErr)),
             onMainEvent('menu_toggle_terminal', toggleTerminal),
             onMainEvent('menu_new_terminal', () => newTerminal()),
-            onMainEvent('menu_new_mysql_terminal', () => newTerminal('mysql')),
+            onMainEvent('menu_new_mysql_terminal', () => newTerminal(databaseType(dialect.Dialect))),
         ];
         return () => offs.forEach((off) => off && off());
     });
@@ -167,7 +170,7 @@ export function DBView() {
 
     // always edit the structure as it is on the server right now
     const editStructure = (tab: EditorTab, add?: 'column' | 'index' | 'foreignKey') =>
-        loadTableDef((sql) => api.rows(conID, sql), selectedTable)
+        api.tableMetadata(conID,selectedTable).then((meta) => dialect.Dialect === 'postgres' ? postgresTableDef(meta,selectedTable) : tableDefFromMetadata(meta,selectedTable))
             .then((original) => setEditing({ original, tab, add }))
             .catch((err) => notify(err.message || `${err}`, 'error'));
     const [sidebarW, setSidebarW] = usePersistentSize('sequel-fidl.sidebar-w', 248);
@@ -313,13 +316,13 @@ export function DBView() {
 
     const tableNames = React.useMemo(() => tables.map((t) => t.Name), [tables]);
     const dialectLabel = dialect.Dialect
-        ? `${dialect.Dialect === 'mysql' ? 'MySQL' : dialect.Dialect} ${
+        ? `${DATABASES[databaseType(dialect.Dialect)].label} ${
               dialect.Version || ''
           }`
         : 'Connecting…';
 
     return (
-        <div className="app">
+        <DialectContext.Provider value={databaseType(dialect.Dialect)}><div className="app">
             <header className={`titlebar ${isMac ? 'is-mac' : ''}`}>
                 <div className="titlebar-left">
                     <TransactionControls flow={flow} />
@@ -684,6 +687,6 @@ export function DBView() {
                     }}
                 />
             )}
-        </div>
+        </div></DialectContext.Provider>
     );
 }

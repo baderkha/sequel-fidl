@@ -1,9 +1,10 @@
 import React from 'react';
+import { useDatabaseDialect } from 'renderer/database/DialectContext';
+import { sqlFor } from 'renderer/util/sql';
 import { CircleAlert, RefreshCw, Sparkles, Table2 } from 'lucide-react';
 import { api, ColSchema } from 'renderer/api';
 import { DataGrid } from '../DataGrid/DataGrid';
 import { SqlEditor } from '../SqlEditor/SqlEditor';
-import { ident, str } from '../CreateTable/model';
 import {
     castValue,
     ColumnInfo,
@@ -41,9 +42,6 @@ const CHUNK_ROWS = 1000;
 const UNIQUE_RETRIES = 50;
 
 const lookupKey = (p: GenParams) => `${p.table}.${p.column}`;
-
-const literal = (v: any) =>
-    v === null || v === undefined ? 'NULL' : typeof v === 'number' ? `${v}` : str(`${v}`);
 
 /**
  * Generate rows for the included columns.
@@ -106,6 +104,8 @@ const chunk = (rows: any[][]) => {
 };
 
 export function SeedDialog(p: SeedDialogProps) {
+    const dialect = useDatabaseDialect();
+    const { ident,literal,table:tableIdent } = sqlFor(dialect);
     const [configs, setConfigs] = React.useState<ColConfig[]>([]);
     const [count, setCount] = React.useState('50');
     const [ignore, setIgnore] = React.useState(false);
@@ -121,18 +121,10 @@ export function SeedDialog(p: SeedDialogProps) {
     React.useEffect(() => {
         Promise.all([
             p.getSchema(p.table),
-            api.runQuery(
-                p.conID,
-                `SELECT COLUMN_NAME c, REFERENCED_TABLE_NAME t, REFERENCED_COLUMN_NAME r
-                 FROM information_schema.KEY_COLUMN_USAGE
-                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ${str(p.table)}
-                   AND REFERENCED_TABLE_NAME IS NOT NULL`
-            ),
-        ]).then(([schema, [fkRows]]) => {
+            api.tableMetadata(p.conID,p.table),
+        ]).then(([schema, metadata]) => {
             const fks = new Map<string, { table: string; column: string }>();
-            (Array.isArray(fkRows) ? fkRows : []).forEach((r: any) =>
-                fks.set(r.c, { table: r.t, column: r.r })
-            );
+            metadata.foreignKeys.forEach((r: any) => fks.set(r.c,{ table:r.rt,column:r.rc }));
             setConfigs(
                 (schema || []).map((s) => {
                     const col = columnInfo(s);
@@ -162,7 +154,7 @@ export function SeedDialog(p: SeedDialogProps) {
             }
             api.runQuery(
                 p.conID,
-                `SELECT DISTINCT ${ident(lp.column)} v FROM ${ident(lp.table)} WHERE ${ident(
+                `SELECT DISTINCT ${ident(lp.column)} v FROM ${tableIdent(lp.table)} WHERE ${ident(
                     lp.column
                 )} IS NOT NULL LIMIT 5000`
             ).then(([rows]) =>
@@ -234,9 +226,9 @@ export function SeedDialog(p: SeedDialogProps) {
         const shown = preview.slice(0, 3);
         const values = shown.map((row) => `  (${row.map(literal).join(', ')})`).join(',\n');
         const more = rowCount - shown.length;
-        return `INSERT ${ignore ? 'IGNORE ' : ''}INTO ${ident(p.table)} (${cols})\nVALUES\n${values}${
+        return `INSERT ${ignore && dialect === 'mysql' ? 'IGNORE ' : ''}INTO ${tableIdent(p.table)} (${cols})\nVALUES\n${values}${
             more > 0 ? `,\n  -- … ${more.toLocaleString()} more generated rows (sent as parameterized batches)` : ''
-        };`;
+        }${ignore && dialect === 'postgres' ? ' ON CONFLICT DO NOTHING' : ''};`;
     }, [preview, ignore, rowCount]);
 
     const insert = async () => {

@@ -27,6 +27,15 @@ export type Table = {
     Type: 'table' | 'view';
 };
 
+/** Dialect-neutral metadata consumed by structure, table editing and seeding. */
+export type TableMetadata = {
+    columns: any[];
+    indexes: any[];
+    foreignKeys: any[];
+    options: Record<string, any>;
+    ddl: string;
+};
+
 /**
  * For Viewing on the client side , it also provides js friendly type
  */
@@ -115,6 +124,29 @@ const FILTER_OPERATIONS: FilterOperations[] = [
 ];
 
 export abstract class AdminSQLCommand {
+    async GetTableMetadata(con: Sequelize, table: string, transaction?: Transaction): Promise<TableMetadata> {
+        const query = (sql: string) => con.query(sql, { type: QueryTypes.SELECT, transaction }) as Promise<any[]>;
+        const name = con.escape(table);
+        const options = await query(`SELECT ENGINE engine, TABLE_COLLATION collation, TABLE_COMMENT comment, TABLE_TYPE type FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ${name}`);
+        const view = options[0]?.type === 'VIEW';
+        const [columns, indexes, foreignKeys, ddl] = await Promise.all([
+            query(`SHOW FULL COLUMNS FROM ${this.QuoteIdent(table)}`),
+            view ? Promise.resolve([]) : query(`SHOW INDEX FROM ${this.QuoteIdent(table)}`),
+            view ? Promise.resolve([]) : query(`SELECT k.CONSTRAINT_NAME n, k.COLUMN_NAME c, k.REFERENCED_TABLE_NAME rt,
+                k.REFERENCED_COLUMN_NAME rc, r.UPDATE_RULE u, r.DELETE_RULE d
+                FROM information_schema.KEY_COLUMN_USAGE k
+                JOIN information_schema.REFERENTIAL_CONSTRAINTS r
+                ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME AND r.TABLE_NAME = k.TABLE_NAME
+                WHERE k.TABLE_SCHEMA = DATABASE() AND k.TABLE_NAME = ${name} AND k.REFERENCED_TABLE_NAME IS NOT NULL
+                ORDER BY k.CONSTRAINT_NAME, k.ORDINAL_POSITION`),
+            this.ShowCreateSQL(con, table),
+        ]);
+        return { columns, indexes, foreignKeys, options: options[0] || {}, ddl };
+    }
+
+    QuoteTable(name: string): string { return this.QuoteIdent(name); }
+    NullComparison(): string { return '<=>'; }
     abstract RenameTable(
         con: Sequelize,
         oldTableName: string,
@@ -124,11 +156,12 @@ export abstract class AdminSQLCommand {
         con: Sequelize,
         tableName: string
     ): Promise<string>;
-    abstract ShowAllTables(con: Sequelize): Promise<Table[]>;
-    abstract ShowCreateSQL(con: Sequelize, tableName: string): Promise<string>;
+    abstract ShowAllTables(con: Sequelize, transaction?: Transaction): Promise<Table[]>;
+    abstract ShowCreateSQL(con: Sequelize, tableName: string, transaction?: Transaction): Promise<string>;
     abstract ShowSchema(
         con: Sequelize,
-        tableName: string
+        tableName: string,
+        transaction?: Transaction
     ): Promise<ColSchema[]>;
     abstract ListDatabases(con: Sequelize): Promise<string[]>;
     abstract GetSupportedTypes(): string[];
@@ -143,14 +176,14 @@ export abstract class AdminSQLCommand {
 
     TruncateTable(con: Sequelize, tableName: string): Promise<Error> {
         return con
-            .query(`TRUNCATE TABLE ${this.QuoteIdent(tableName)}`)
+            .query(`TRUNCATE TABLE ${this.QuoteTable(tableName)}`)
             .then(() => null)
             .catch((err) => err as Error);
     }
 
     DropTable(con: Sequelize, tableName: string): Promise<Error> {
         return con
-            .query(`DROP TABLE ${this.QuoteIdent(tableName)}`)
+            .query(`DROP TABLE ${this.QuoteTable(tableName)}`)
             .then(() => null)
             .catch((err) => err as Error);
     }
@@ -197,7 +230,7 @@ export abstract class AdminSQLCommand {
             await con.query(
                 `CREATE TABLE ${this.QuoteIdent(
                     duplicateName
-                )} LIKE ${this.QuoteIdent(tableName)}`,
+                )} LIKE ${this.QuoteTable(tableName)}`,
                 {
                     transaction: t,
                 }
@@ -206,7 +239,7 @@ export abstract class AdminSQLCommand {
                 await con.query(
                     `INSERT INTO ${this.QuoteIdent(
                         duplicateName
-                    )} SELECT * FROM ${this.QuoteIdent(tableName)}`,
+                    )} SELECT * FROM ${this.QuoteTable(tableName)}`,
                     {
                         transaction: t,
                     }
@@ -277,13 +310,13 @@ export abstract class AdminSQLCommand {
             s.limit !== undefined && s.limit !== null
                 ? ` LIMIT ${Math.max(0, Math.floor(s.limit) || 0)}${s.offset ? ` OFFSET ${Math.max(0, Math.floor(s.offset))}` : ''}`
                 : '';
-        return [`SELECT ${cols} FROM ${this.QuoteIdent(s.tableName)}${where ? ` ${where}` : ''}${order}${limit}`, args];
+        return [`SELECT ${cols} FROM ${this.QuoteTable(s.tableName)}${where ? ` ${where}` : ''}${order}${limit}`, args];
     }
 
     /** SELECT COUNT(*) with the same filters as BuildSelect */
     BuildCount(tableName: string, filters: Filter[] = [], mode: FilterMode = 'AND'): [string, any[]] {
         const [where, args] = this.buildWhere(filters, mode);
-        return [`SELECT COUNT(*) AS total FROM ${this.QuoteIdent(tableName)}${where ? ` ${where}` : ''}`, args];
+        return [`SELECT COUNT(*) AS total FROM ${this.QuoteTable(tableName)}${where ? ` ${where}` : ''}`, args];
     }
 
     SelectFromTable(
@@ -333,7 +366,7 @@ export abstract class AdminSQLCommand {
             return Promise.resolve(NewErrorTuple(0, null));
         }
         const tuple = `(${columns.map(() => '?').join(', ')})`;
-        const sql = `INSERT ${ignore ? 'IGNORE ' : ''}INTO ${this.QuoteIdent(tableName)} (${columns
+        const sql = `INSERT ${ignore ? 'IGNORE ' : ''}INTO ${this.QuoteTable(tableName)} (${columns
             .map((c) => this.QuoteIdent(c))
             .join(', ')}) VALUES ${rows.map(() => tuple).join(', ')}`;
         return con
@@ -360,7 +393,7 @@ export abstract class AdminSQLCommand {
         return `(${Object.entries(key)
             .map(([col, v]) => {
                 args.push(toDriver(v));
-                return `${this.QuoteIdent(col)} <=> ?`;
+                return `${this.QuoteIdent(col)} ${this.NullComparison()} ?`;
             })
             .join(' AND ')})`;
     }
@@ -379,7 +412,7 @@ export abstract class AdminSQLCommand {
         byAllColumns: boolean,
         parent?: Transaction
     ): Promise<ErrorTuple<number>> {
-        const table = this.QuoteIdent(tableName);
+        const table = this.QuoteTable(tableName);
         try {
             // inside an open session transaction this becomes a savepoint
             const affected = await con.transaction({ transaction: parent }, async (transaction) => {
@@ -423,7 +456,7 @@ export abstract class AdminSQLCommand {
         byAllColumns: boolean,
         parent?: Transaction
     ): Promise<ErrorTuple<number>> {
-        const table = this.QuoteIdent(tableName);
+        const table = this.QuoteTable(tableName);
         try {
             // inside an open session transaction this becomes a savepoint
             const affected = await con.transaction({ transaction: parent }, async (transaction) => {
@@ -483,7 +516,7 @@ export abstract class AdminSQLCommand {
         const [where, args] = this.buildWhere(filters, mode);
         return con
             .query(
-                `SELECT COUNT(*) AS total FROM ${this.QuoteIdent(
+                `SELECT COUNT(*) AS total FROM ${this.QuoteTable(
                     tableName
                 )} ${where}`,
                 {

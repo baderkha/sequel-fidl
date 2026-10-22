@@ -10,7 +10,7 @@ export type Statement = {
  * Split sql into statements on `;` , ignoring the ones inside quotes and comments
  * @param sql
  */
-export function splitStatements(sql: string): Statement[] {
+export function splitStatements(sql: string, dialect: 'mysql' | 'postgres' = 'mysql'): Statement[] {
     const out: Statement[] = [];
     let segStart = 0;
     let i = 0;
@@ -29,22 +29,32 @@ export function splitStatements(sql: string): Statement[] {
     while (i < sql.length) {
         const ch = sql[i];
         const next = sql[i + 1];
-        if (ch === "'" || ch === '"' || ch === '`') {
+        const dollar = dialect === 'postgres' && ch === '$' ? sql.slice(i).match(/^\$(?:[a-zA-Z_][a-zA-Z_0-9]*)?\$/)?.[0] : null;
+        if (dollar) {
+            const end = sql.indexOf(dollar, i + dollar.length);
+            i = end < 0 ? sql.length : end + dollar.length;
+        } else if (ch === "'" || ch === '"' || ch === '`') {
+            const backslashEscapes = dialect === 'mysql' || (ch === "'" && /[eE]/.test(sql[i-1] || ''));
             i++;
             while (i < sql.length && sql[i] !== ch) {
-                if (sql[i] === '\\' && ch !== '`') {
+                if (sql[i] === '\\' && ch !== '`' && backslashEscapes) {
                     i++;
                 }
                 i++;
             }
             i++;
-        } else if ((ch === '-' && next === '-') || ch === '#') {
+        } else if ((ch === '-' && next === '-') || (dialect === 'mysql' && ch === '#')) {
             while (i < sql.length && sql[i] !== '\n') {
                 i++;
             }
         } else if (ch === '/' && next === '*') {
-            const close = sql.indexOf('*/', i + 2);
-            i = close < 0 ? sql.length : close + 2;
+            let depth = 1;
+            i += 2;
+            while (i < sql.length && depth) {
+                if (dialect === 'postgres' && sql.slice(i,i+2) === '/*') { depth++; i += 2; }
+                else if (sql.slice(i,i+2) === '*/') { depth--; i += 2; }
+                else i++;
+            }
         } else if (ch === ';') {
             push(i);
             i++;
@@ -65,8 +75,8 @@ const stripComments = (sql: string) =>
  * @param sql
  * @param offset cursor offset
  */
-export function statementAt(sql: string, offset: number): Statement | null {
-    const stmts = splitStatements(sql);
+export function statementAt(sql: string, offset: number, dialect: 'mysql' | 'postgres' = 'mysql'): Statement | null {
+    const stmts = splitStatements(sql,dialect);
     if (!stmts.length) {
         return null;
     }

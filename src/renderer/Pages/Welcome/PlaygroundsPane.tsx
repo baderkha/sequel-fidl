@@ -1,4 +1,5 @@
 import React from 'react';
+import { DATABASES, DatabaseType, databaseType } from 'shared/db/dialects';
 import {
     Box,
     CircleAlert,
@@ -15,7 +16,7 @@ import { Modal } from 'renderer/Components/ui/Modal';
 import { useToast } from 'renderer/Components/ui/Toasts';
 import dockerNames from 'docker-names'
 
-const VERSIONS = [
+const MYSQL_VERSIONS = [
     { tag: '8.4', label: 'MySQL 8.4 (LTS)' },
     { tag: '8.0', label: 'MySQL 8.0' },
     { tag: '5.7', label: 'MySQL 5.7 (x86 only , emulated on Apple Silicon)' },
@@ -52,12 +53,14 @@ export function PlaygroundsPane({ onConnected }: { onConnected: (s: SessionInfo)
     const [docker, setDocker] = React.useState<boolean | null>(null);
     const [selected, setSelected] = React.useState<number | 'new'>('new');
    
-    const [customPort,setCustomPort] = React.useState(null);
+    const [customPort,setCustomPort] = React.useState('');
+    const [type, setType] = React.useState<DatabaseType>('mysql');
+    const VERSIONS = type === 'postgres' ? ['17','18','16'].map((tag) => ({ tag, label: `PostgreSQL ${tag}` })) : MYSQL_VERSIONS;
     const [version, setVersion] = React.useState('8.4');
     const [custom, setCustom] = React.useState('');
     const [sample, setSample] = React.useState('');
     const [samples, setSamples] = React.useState<
-        { id: string; name: string; description: string; database: string }[]
+        { id: string; name: string; description: string; database: string; type: DatabaseType }[]
     >([]);
     const [error, setError] = React.useState('');
     const [opening, setOpening] = React.useState<number | null>(null);
@@ -120,7 +123,7 @@ export function PlaygroundsPane({ onConnected }: { onConnected: (s: SessionInfo)
             return;
         }
         setError('');
-        api.createPlayground({ name: name.trim(), version: tag, sample,port : customPort }).then(([pg, err]) => {
+        api.createPlayground({ type, name: name.trim(), version: tag, sample,port: customPort.trim() ? Number(customPort) : undefined }).then(([pg, err]) => {
             if (err) {
                 setError(err.message);
                 return;
@@ -182,7 +185,7 @@ export function PlaygroundsPane({ onConnected }: { onConnected: (s: SessionInfo)
                         <span className="welcome-item-text">
                             <span className="welcome-item-title">{pg.name}</span>
                             <span className="welcome-item-sub">
-                                MySQL {pg.version} · {pg.state === 'running' ? 'running' : 'stopped'}
+                                {DATABASES[databaseType(pg.type)].label} {pg.version} · {pg.state === 'running' ? 'running' : 'stopped'}
                             </span>
                         </span>
                         <StateDot pg={pg} />
@@ -195,7 +198,7 @@ export function PlaygroundsPane({ onConnected }: { onConnected: (s: SessionInfo)
                     <div className="banner is-warning">
                         <CircleAlert size={15} />
                         <span>
-                            Docker isn't reachable. Playgrounds run MySQL in Docker , start Docker
+                            Docker isn't reachable. Playgrounds run database servers in Docker , start Docker
                             Desktop (or OrbStack / Colima).
                         </span>
                         <button type="button" className="btn is-ghost" onClick={refresh}>
@@ -228,7 +231,7 @@ export function PlaygroundsPane({ onConnected }: { onConnected: (s: SessionInfo)
                             <dt>Windows</dt>
                             <dd>{current.connected ? 'Open' : 'None'}</dd>
                             <dt>Version</dt>
-                            <dd>MySQL {current.version}</dd>
+                            <dd>{DATABASES[databaseType(current.type)].label} {current.version}</dd>
                             <dd>Port</dd>
                             <dd>{current.port}</dd>
                             <dt>Login</dt>
@@ -315,17 +318,23 @@ export function PlaygroundsPane({ onConnected }: { onConnected: (s: SessionInfo)
                     >
                         <div className="welcome-pane-title">New playground</div>
                         <p className="ct-hint">
-                            A throwaway MySQL server running in Docker. Its data lives in the app's
+                            A disposable database server running in Docker. Its data lives in the app's
                             own folder and survives restarts.
                         </p>
                         <div className="form-grid">
+                            <label className="field span-2"><span className="field-label">Database engine</span>
+                                <select className="select" value={type} onChange={(ev) => {
+                                    const next = ev.target.value as DatabaseType;
+                                    setType(next); setVersion(DATABASES[next].version); setSample(''); setCustom('');
+                                }}>{Object.entries(DATABASES).map(([key, engine]) => <option key={key} value={key}>{engine.label}</option>)}</select>
+                            </label>
                             <label className="field span-2">
                                 <span className="field-label">Name</span>
                                 <input
                                     className="app-input"
                                     autoFocus
                                     value={name}
-                                    placeholder={`MySQL ${version === 'custom' ? custom || '…' : version}`}
+                                    placeholder={`${DATABASES[type].label} ${version === 'custom' ? custom || '…' : version}`}
                                     onChange={(ev) => setName(ev.target.value)}
                                 />
                             </label>
@@ -371,7 +380,7 @@ export function PlaygroundsPane({ onConnected }: { onConnected: (s: SessionInfo)
                         <div className="field">
                             <span className="field-label">Start with</span>
                             <div className="sample-options">
-                                {[{ id: '', name: 'Empty database', description: 'Just main_db , build your own tables.', database: '' }, ...samples].map((s) => (
+                                {[{ id: '', name: 'Empty database', description: 'Just main_db , build your own tables.', database: '' }, ...samples.filter((s) => s.type === type)].map((s) => (
                                     <label key={s.id || 'none'} className={`sample-option ${sample === s.id ? 'is-active' : ''}`}>
                                         <input
                                             type="radio"

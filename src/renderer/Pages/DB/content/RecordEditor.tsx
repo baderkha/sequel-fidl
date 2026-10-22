@@ -1,4 +1,5 @@
 import React from 'react';
+import { useDatabaseDialect } from 'renderer/database/DialectContext';
 import { Braces, ChevronLeft, CircleAlert } from 'lucide-react';
 import type { ColSchema, ColumnAssignment } from 'renderer/api';
 import { Modal } from 'renderer/Components/ui/Modal';
@@ -14,6 +15,7 @@ export function RecordEditor(p: {
     onClose: () => void;
     onSave: (assignments: ColumnAssignment[]) => Promise<string | null>;
 }) {
+    const dialect = useDatabaseDialect();
     const before = React.useMemo(() => toRecordDocument(p.row, p.schema), [p.row, p.schema]);
     const [draft, setDraft] = React.useState(() => JSON.stringify(before, null, 2));
     const [review, setReview] = React.useState(false);
@@ -35,7 +37,7 @@ export function RecordEditor(p: {
                 title={<>Update record in <code>{p.table}</code>?</>}
                 submitLabel="Update record"
                 warning={p.warning}
-                sql={updateSQL(p.table, result.assignments, [pick(p.row, p.keyInfo.cols)], p.keyInfo)}
+                sql={updateSQL(p.table, result.assignments, [pick(p.row, p.keyInfo.cols)], p.keyInfo, dialect)}
                 onClose={p.onClose}
                 onSubmit={async () => {
                     setSaving(true);

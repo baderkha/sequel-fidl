@@ -7,7 +7,7 @@ import { DataGrid, GridColumn } from 'renderer/Components/DataGrid/DataGrid';
 import { SqlEditor } from 'renderer/Components/SqlEditor/SqlEditor';
 import { Splitter, usePersistentSize } from 'renderer/Components/ui/Splitter';
 import { useToast } from 'renderer/Components/ui/Toasts';
-import { ident, str, Tab } from 'renderer/Components/CreateTable/model';
+import { Tab } from 'renderer/Components/CreateTable/model';
 
 export type StructureProps = {
     TableName: string;
@@ -77,43 +77,23 @@ export const Structure = (p: StructureProps) => {
         setLoading(true);
         setError('');
         const t = p.TableName;
-        Promise.all([
-            api.rows(conID, `SHOW FULL COLUMNS FROM ${ident(t)}`),
-            p.isView ? Promise.resolve([]) : api.rows(conID, `SHOW INDEX FROM ${ident(t)}`),
-            p.isView
-                ? Promise.resolve([])
-                : api.rows(
-                      conID,
-                      `SELECT k.CONSTRAINT_NAME n, GROUP_CONCAT(k.COLUMN_NAME ORDER BY k.ORDINAL_POSITION) c,
-                              k.REFERENCED_TABLE_NAME rt,
-                              GROUP_CONCAT(k.REFERENCED_COLUMN_NAME ORDER BY k.ORDINAL_POSITION) rc,
-                              r.DELETE_RULE d, r.UPDATE_RULE u
-                       FROM information_schema.KEY_COLUMN_USAGE k
-                       JOIN information_schema.REFERENTIAL_CONSTRAINTS r
-                         ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME
-                        AND r.TABLE_NAME = k.TABLE_NAME
-                       WHERE k.TABLE_SCHEMA = DATABASE() AND k.TABLE_NAME = ${str(t)}
-                         AND k.REFERENCED_TABLE_NAME IS NOT NULL
-                       GROUP BY k.CONSTRAINT_NAME, k.REFERENCED_TABLE_NAME, r.DELETE_RULE, r.UPDATE_RULE`
-                  ),
-            api.createSQL(conID, t),
-        ])
-            .then(([cols, idx, fk, sql]) => {
+        api.tableMetadata(conID,t)
+            .then(({ columns:cols,indexes:idx,foreignKeys:fk,ddl:sql }) => {
                 if (!live) {
                     return;
                 }
                 setColumns(cols.map(({ Privileges, ...rest }) => rest));
                 setIndexes(groupIndexes(idx));
                 setFks(
-                    fk.map((r) => ({
+                    Array.from(new Map(fk.map((r) => [r.n,r])).values()).map((r) => ({
                         Name: r.n,
-                        Columns: `${r.c}`.split(',').join(', '),
-                        References: `${r.rt} (${`${r.rc}`.split(',').join(', ')})`,
+                        Columns: fk.filter((part) => part.n === r.n).map((part) => part.c).join(',').split(',').join(', '),
+                        References: `${r.rt} (${`${fk.filter((part) => part.n === r.n).map((part) => part.rc).join(',')}`.split(',').join(', ')})`,
                         'On Delete': r.d,
                         'On Update': r.u,
                     }))
                 );
-                setDDL(sql ? `${sql};` : '');
+                setDDL(sql ? `${sql.replace(/;\s*$/, '')};` : '');
             })
             .catch((err) => live && setError(err.message || `${err}`))
             .finally(() => live && setLoading(false));

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useDatabaseDialect } from 'renderer/database/DialectContext';
 import { useAtom } from 'jotai';
 import {
     ChevronLeft,
@@ -11,6 +12,8 @@ import {
     RefreshCw,
     Sparkles,
     Table2,
+    Plus,
+    X,
 } from 'lucide-react';
 import type { ExportSourceSpec } from 'renderer/api';
 import { ConID, TxStateAtom } from 'renderer/State';
@@ -23,6 +26,7 @@ import { ContextMenu, MenuEntry, useContextMenu } from 'renderer/Components/ui/C
 import { AppliedFilters, FilterBar } from './FilterBar';
 import { DocumentView } from './DocumentView';
 import { RecordEditor } from './RecordEditor';
+import { newRecordDraft, recordInsert, RecordDraft, RecordInsert } from './recordDraft';
 import {
     AssignmentsEditor,
     BulkBar,
@@ -64,6 +68,7 @@ export const schemaToColumns = (schema: ColSchema[]): GridColumn[] =>
 const fmt = (n: number) => n.toLocaleString();
 
 export const Content = (p: ContentTabProps) => {
+    const dialect = useDatabaseDialect();
     const [conID] = useAtom(ConID);
     const [schema, setSchema] = React.useState<ColSchema[]>([]);
     const [rows, setRows] = React.useState<any[]>([]);
@@ -89,13 +94,24 @@ export const Content = (p: ContentTabProps) => {
     const [assignments, setAssignments] = React.useState<ColumnAssignment[]>([]);
     const [cellChange, setCellChange] = React.useState<GridCellEdit | null>(null);
     const [recordChange, setRecordChange] = React.useState<Record<string, any> | null>(null);
+    const [draft, setDraft] = React.useState<RecordDraft | null>(null);
+    const [insertReview, setInsertReview] = React.useState<RecordInsert | null>(null);
+    const [draftError, setDraftError] = React.useState('');
     const copyMenu = useContextMenu();
     const requestId = React.useRef(0);
+
+    React.useEffect(() => {
+        if (insertReview) document.querySelector<HTMLButtonElement>('.backdrop .modal-footer button[type="submit"]')?.focus();
+        else document.querySelector<HTMLTextAreaElement>('.grid-draft-row textarea:not(:disabled)')?.focus();
+    }, [insertReview]);
 
     React.useEffect(() => {
         setCellChange(null);
         setRecordChange(null);
         setDialog(null);
+        setDraft(null);
+        setInsertReview(null);
+        setDraftError('');
     }, [conID, p.TableName]);
 
     React.useEffect(() => {
@@ -196,6 +212,9 @@ export const Content = (p: ContentTabProps) => {
         setDialog(null);
         setCellChange(null);
         setRecordChange(null);
+        setDraft(null);
+        setInsertReview(null);
+        setDraftError('');
         setSelection(new Set());
         setReload((r) => r + 1);
     };
@@ -212,7 +231,7 @@ export const Content = (p: ContentTabProps) => {
     const copyAs = (format: CopyFormat, sel: Set<number> = selection) => {
         const rs = rowsOf(sel);
         navigator.clipboard
-            .writeText(rowsAs(format, p.TableName, colNames, rs))
+            .writeText(rowsAs(format, p.TableName, colNames, rs, dialect, schema))
             .then(() => notify(`Copied ${rs.length} row${rs.length === 1 ? '' : 's'} as ${format.toUpperCase()}`, 'success'));
     };
     const copyEntries = (sel?: Set<number>): MenuEntry[] =>
@@ -235,6 +254,16 @@ export const Content = (p: ContentTabProps) => {
     const first = rows.length ? page * pageSize + 1 : 0;
     const last = page * pageSize + rows.length;
     const canNext = pages !== null ? page + 1 < pages : rows.length === pageSize;
+    const cancelInsert = () => {
+        setDraft(null);
+        setInsertReview(null);
+        setDraftError('');
+    };
+    const reviewInsert = () => {
+        if (!draft) return;
+        try { setInsertReview(recordInsert(schema, draft)); setDraftError(''); }
+        catch (err) { setDraftError((err as Error).message); }
+    };
 
     return (
         <div className="view">
@@ -250,13 +279,20 @@ export const Content = (p: ContentTabProps) => {
                 <div className="content-head-actions">
                     <div className="content-view-toggle" role="group" aria-label="Content view">
                         <button type="button" aria-pressed={contentView === 'table'} onClick={() => setContentView('table')}><Table2 size={13} /> Table</button>
-                        <button type="button" aria-pressed={contentView === 'json'} onClick={() => setContentView('json')}><Braces size={13} /> JSON</button>
+                        <button type="button" aria-pressed={contentView === 'json'} disabled={!!draft} onClick={() => setContentView('json')}><Braces size={13} /> JSON</button>
                     </div>
                     {tx.open && (
                         <span className="tx-pill" title="Rows include changes not committed yet , only this window sees them">
                             <span className="tx-dot" /> In transaction
                         </span>
                     )}
+                    {!p.isView && <button type="button" className="btn" disabled={!conID || !p.TableName || !schema.length || loading || !!error || !!draft || !!cellChange || !!dialog || !!recordChange}
+                        onClick={() => {
+                            setContentView('table');
+                            setSelection(new Set());
+                            setDraftError('');
+                            setDraft(newRecordDraft(schema));
+                        }}><Plus size={13} /> Insert Record</button>}
                 {p.onSeed && (
                     <button
                         type="button"
@@ -277,6 +313,13 @@ export const Content = (p: ContentTabProps) => {
                 </button>
                 </div>
             </div>
+            {draft && <div className="record-insert-bar">
+                <span className="toolbar-text">New record · Unfilled defaults and IDs are generated automatically.</span>
+                <div className="toolbar-spacer" />
+                <button type="button" className="btn is-ghost" disabled={!!insertReview} onClick={cancelInsert}><X size={13} /> Cancel record</button>
+                <button type="button" className="btn is-primary" disabled={!!insertReview} onClick={reviewInsert}>Review insert…</button>
+            </div>}
+            {draftError && <div className="error-box" role="alert"><CircleAlert size={15} />{draftError}</div>}
             {error ? (
                 <div className="result-message is-error">
                     <div className="error-box">
@@ -302,6 +345,16 @@ export const Content = (p: ContentTabProps) => {
                     ) : <DataGrid
                         columns={columns}
                         rows={rows}
+                        draft={draft ? {
+                            cells: draft,
+                            disabled: !!insertReview,
+                            onChange: (column, cell) => {
+                                setDraft((current) => current ? { ...current, [column]: cell } : current);
+                                setDraftError('');
+                            },
+                            onCancel: cancelInsert,
+                            onReview: reviewInsert,
+                        } : undefined}
                         loading={loading}
                         sort={sort}
                         manualSort
@@ -312,11 +365,11 @@ export const Content = (p: ContentTabProps) => {
                         rowOffset={page * pageSize}
                         storageKey={`content:${p.TableName}`}
                         empty={applied ? 'No rows match the filter' : 'This table is empty'}
-                        selection={p.isView ? undefined : selection}
-                        onSelectionChange={p.isView ? undefined : setSelection}
+                        selection={p.isView || draft ? undefined : selection}
+                        onSelectionChange={p.isView || draft ? undefined : setSelection}
                         onDeleteRequest={(sel) => openDialog('delete', sel)}
                         selectionMenu={selectionMenu}
-                        onCellEdit={!p.isView && schema.length && !cellChange && !dialog
+                        onCellEdit={!p.isView && !draft && schema.length && !cellChange && !dialog
                             ? (edit) => setCellChange({ ...edit, row: { ...edit.row } })
                             : undefined}
                     />}
@@ -441,6 +494,22 @@ export const Content = (p: ContentTabProps) => {
                 </button>
             </div>
             <ContextMenu {...copyMenu} />
+            {insertReview && <ConfirmSQL
+                icon={<Plus size={16} />}
+                title={`Insert record into ${p.TableName}?`}
+                submitLabel="Insert record"
+                sql={insertSQL(p.TableName, insertReview.columns, [Object.fromEntries(insertReview.columns.map((column, i) => [column, insertReview.values[i]]))], dialect)}
+                onClose={() => setInsertReview(null)}
+                onSubmit={async () => {
+                    const [n, err] = await api.insertRows(conID, p.TableName, insertReview.columns, [insertReview.values], false);
+                    if (err) return err.message;
+                    // A completed INSERT can have an unavailable/zero count (for
+                    // example an older backend or an INSTEAD OF trigger). Refresh
+                    // the table rather than inviting a duplicate retry.
+                    done(n > 0 ? 'Inserted record' : 'Insert completed; table refreshed');
+                    return null;
+                }}
+            />}
             {recordChange && (
                 <RecordEditor
                     row={recordChange}
@@ -464,7 +533,7 @@ export const Content = (p: ContentTabProps) => {
                     title={<>Update <code>{cellChange.column.key}</code> in <code>{p.TableName}</code>?</>}
                     submitLabel="Update row"
                     warning={noKeyWarning}
-                    sql={updateSQL(p.TableName, [{ column: cellChange.column.key, mode: 'value', value: cellChange.value }], keysOf([cellChange.row]), keyInfo)}
+                    sql={updateSQL(p.TableName, [{ column: cellChange.column.key, mode: 'value', value: cellChange.value }], keysOf([cellChange.row]), keyInfo, dialect)}
                     onClose={() => setCellChange(null)}
                     onSubmit={async () => {
                         const [n, err] = await api.updateRows(
@@ -500,7 +569,7 @@ export const Content = (p: ContentTabProps) => {
                     submitLabel="Delete"
                     danger
                     warning={noKeyWarning}
-                    sql={deleteSQL(p.TableName, keysOf(dialog.rows), keyInfo)}
+                    sql={deleteSQL(p.TableName, keysOf(dialog.rows), keyInfo, dialect)}
                     onClose={() => setDialog(null)}
                     onSubmit={async () => {
                         const [n, err] = await api.deleteRows(conID, p.TableName, keysOf(dialog.rows), keyInfo.byAll);
@@ -517,7 +586,7 @@ export const Content = (p: ContentTabProps) => {
                     submitLabel={`Update ${dialog.rows.length.toLocaleString()} row${dialog.rows.length === 1 ? '' : 's'}`}
                     warning={noKeyWarning}
                     disabled={assignments.some((a) => a.mode === 'expression' && !`${a.value || ''}`.trim())}
-                    sql={updateSQL(p.TableName, assignments, keysOf(dialog.rows), keyInfo)}
+                    sql={updateSQL(p.TableName, assignments, keysOf(dialog.rows), keyInfo, dialect)}
                     onClose={() => setDialog(null)}
                     onSubmit={async () => {
                         const [n, err] = await api.updateRows(conID, p.TableName, assignments, keysOf(dialog.rows), keyInfo.byAll);
@@ -539,9 +608,9 @@ export const Content = (p: ContentTabProps) => {
                             ? undefined
                             : keyInfo.byAll
                             ? undefined
-                            : 'This table has no AUTO_INCREMENT column , the copies keep their key values and will fail on a duplicate key unless you change them first.'
+                            : 'This table has no generated identity column , the copies keep their key values and will fail on a duplicate key unless you change them first.'
                     }
-                    sql={insertSQL(p.TableName, dupCols, dialog.rows)}
+                    sql={insertSQL(p.TableName, dupCols, dialog.rows, dialect, schema)}
                     onClose={() => setDialog(null)}
                     onSubmit={async () => {
                         const values = dialog.rows.map((r) => dupCols.map((c) => r[c]));

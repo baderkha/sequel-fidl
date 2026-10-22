@@ -1,4 +1,5 @@
 import React from 'react';
+import { DATABASES, DatabaseType, databaseType } from 'shared/db/dialects';
 import {
     CircleAlert,
     CircleCheck,
@@ -13,6 +14,7 @@ import { Modal } from 'renderer/Components/ui/Modal';
 import { useToast } from 'renderer/Components/ui/Toasts';
 
 type Form = {
+    type: DatabaseType;
     id?: number;
     name: string;
     host: string;
@@ -25,6 +27,7 @@ type Form = {
 };
 
 const EMPTY: Form = {
+    type: 'mysql',
     name: '',
     host: '127.0.0.1',
     port: '3306',
@@ -35,6 +38,7 @@ const EMPTY: Form = {
 };
 
 const fromSaved = (c: SavedConnection): Form => ({
+    type: databaseType(c.type),
     id: c.id,
     name: c.name,
     host: c.host,
@@ -46,10 +50,11 @@ const fromSaved = (c: SavedConnection): Form => ({
 });
 
 const toInput = (f: Form): ConnectionInput => ({
+    type: f.type,
     id: f.id,
     name: f.name.trim(),
     host: f.host.trim() || '127.0.0.1',
-    port: parseInt(f.port, 10) || 3306,
+    port: parseInt(f.port, 10) || DATABASES[f.type].port,
     username: f.username.trim(),
     password: f.keepPassword ? undefined : f.password,
     database: f.database.trim(),
@@ -95,7 +100,7 @@ export function ConnectPane({ onConnected }: { onConnected: (s: SessionInfo) => 
             setStatus(
                 err
                     ? { kind: 'error', message: err.message }
-                    : { kind: 'ok', message: `Connected to MySQL ${version}` }
+                    : { kind: 'ok', message: `Connected to ${DATABASES[form.type].label} ${version}` }
             )
         );
     };
@@ -180,7 +185,7 @@ export function ConnectPane({ onConnected }: { onConnected: (s: SessionInfo) => 
                         <span className="welcome-item-text">
                             <span className="welcome-item-title">{c.name}</span>
                             <span className="welcome-item-sub">
-                                {c.username}@{c.host}:{c.port}
+                                {DATABASES[databaseType(c.type)].label} · {c.username}@{c.host}:{c.port}
                             </span>
                         </span>
                         <button
@@ -206,15 +211,25 @@ export function ConnectPane({ onConnected }: { onConnected: (s: SessionInfo) => 
                 }}
             >
                 <div className="welcome-pane-title">
-                    {form.id ? form.name : 'Connect to MySQL'}
+                    {form.id ? form.name : `Connect to ${DATABASES[form.type].label}`}
                 </div>
                 <div className="form-grid">
+                    <label className="field span-2"><span className="field-label">Database engine</span>
+                        <select className="select" value={form.type} disabled={busy} onChange={(ev) => {
+                            const type = ev.target.value as DatabaseType;
+                            const old = DATABASES[form.type];
+                            const engine = DATABASES[type];
+                            set({ type, port: form.port === String(old.port) ? String(engine.port) : form.port,
+                                username: form.username === old.username ? engine.username : form.username,
+                                database: form.database === old.database ? engine.database : form.database });
+                        }}>{Object.entries(DATABASES).map(([type, engine]) => <option key={type} value={type}>{engine.label}</option>)}</select>
+                    </label>
                     <div className="span-2">
                         {field('Name', 'name', { placeholder: 'Optional — e.g. staging' })}
                     </div>
                     {field('Host', 'host', { placeholder: '127.0.0.1', autoFocus: true })}
-                    {field('Port', 'port', { placeholder: '3306', inputMode: 'numeric' })}
-                    {field('User', 'username', { placeholder: 'root' })}
+                    {field('Port', 'port', { placeholder: String(DATABASES[form.type].port), inputMode: 'numeric' })}
+                    {field('User', 'username', { placeholder: DATABASES[form.type].username })}
                     <label className="field">
                         <span className="field-label">Password</span>
                         <input
@@ -228,7 +243,7 @@ export function ConnectPane({ onConnected }: { onConnected: (s: SessionInfo) => 
                         />
                     </label>
                     <div className="span-2">
-                        {field('Database', 'database', { placeholder: 'Optional' })}
+                        {field('Database', 'database', { placeholder: form.type === 'postgres' ? 'postgres' : 'Optional' })}
                     </div>
                 </div>
 

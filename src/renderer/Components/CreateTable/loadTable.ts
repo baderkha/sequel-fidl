@@ -3,18 +3,13 @@ import {
     DefaultMode,
     FkAction,
     ForeignKeyDef,
-    ident,
     IndexDef,
     IndexKind,
-    str,
     TableDef,
     TYPES,
     typeInfo,
     uid,
 } from './model';
-
-/** runs a query and returns its rows (throws on error) */
-export type RowQuery = (sql: string) => Promise<any[]>;
 
 /** "decimal(10,2) unsigned" => type , param , unsigned */
 const parseType = (raw: string) => {
@@ -57,33 +52,9 @@ const parseDefault = (
     return { defaultMode: 'value', defaultValue: def };
 };
 
-/**
- * Read a table into the editor model
- * @param query
- * @param table
- */
-export async function loadTableDef(query: RowQuery, table: string): Promise<TableDef> {
-    const [cols, idx, fks, info] = await Promise.all([
-        query(`SHOW FULL COLUMNS FROM ${ident(table)}`),
-        query(`SHOW INDEX FROM ${ident(table)}`),
-        query(
-            `SELECT k.CONSTRAINT_NAME n, k.COLUMN_NAME c, k.REFERENCED_TABLE_NAME rt,
-                    k.REFERENCED_COLUMN_NAME rc, r.UPDATE_RULE u, r.DELETE_RULE d
-             FROM information_schema.KEY_COLUMN_USAGE k
-             JOIN information_schema.REFERENTIAL_CONSTRAINTS r
-               ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME
-              AND r.TABLE_NAME = k.TABLE_NAME
-             WHERE k.TABLE_SCHEMA = DATABASE() AND k.TABLE_NAME = ${str(table)}
-               AND k.REFERENCED_TABLE_NAME IS NOT NULL
-             ORDER BY k.CONSTRAINT_NAME, k.ORDINAL_POSITION`
-        ),
-        query(
-            `SELECT ENGINE engine, TABLE_COLLATION collation, TABLE_COMMENT comment
-             FROM information_schema.TABLES
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ${str(table)}`
-        ),
-    ]);
-
+export function tableDefFromMetadata(metadata: import('main/util/sql_admin_commands').TableMetadata, table: string): TableDef {
+    const { columns:cols,indexes:idx,foreignKeys:fks } = metadata;
+    const info = [metadata.options];
     const columns: ColumnDef[] = cols.map((c) => {
         const extra = `${c.Extra || ''}`;
         const { type, param, unsigned } = parseType(`${c.Type}`);

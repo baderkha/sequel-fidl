@@ -24,6 +24,8 @@ export class ShowCreateSQLEvent extends Event<
     { tableName: string } & WithCon
 > {}
 export class ShowSchemaEvent extends Event<{ tableName: string } & WithCon> {}
+export class TableMetadataEvent extends ShowSchemaEvent {}
+export class ApplySchemaChangesEvent extends Event<{ conID: string; statements: string[] }> {}
 export class ListDatabasesEvent extends Event<WithCon> {}
 export class GetSupportedTypesEvent extends Event<WithCon> {}
 export class SwitchDataBaseEvent extends Event<{ dbName: string } & WithCon> {}
@@ -91,6 +93,8 @@ export const SQLEventController = (
     e.handle('show_schema', (_, arg: ShowSchemaEvent) =>
         ser.ShowSchema(arg.Data.conID, arg.Data.tableName)
     );
+    e.handle('table_metadata', (_, arg: TableMetadataEvent) => ser.TableMetadata(arg.Data.conID, arg.Data.tableName));
+    e.handle('apply_schema_changes', (_, arg: ApplySchemaChangesEvent) => ser.ApplySchemaChanges(arg.Data.conID,arg.Data.statements));
     e.handle('list_databases', (_, arg: ListDatabasesEvent) =>
         ser.ListDatabases(arg.Data.conID)
     );

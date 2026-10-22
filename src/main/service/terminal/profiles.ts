@@ -4,7 +4,7 @@ import { PtyProcess } from '../../util/terminal/PtyProcess';
 import { TerminalProcess } from '../../util/terminal/TerminalProcess';
 import { ErrorTuple, NewErrorTuple } from '../../util/tuple';
 
-export type TerminalProfileId = 'shell' | 'mysql';
+export type TerminalProfileId = 'shell' | 'mysql' | 'postgres';
 
 /** what the window knows when it asks for a terminal */
 export type LaunchContext = {

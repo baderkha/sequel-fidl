@@ -4,25 +4,28 @@ import type { ColSchema, ColumnAssignment } from 'renderer/api';
 import { Modal } from 'renderer/Components/ui/Modal';
 import { SqlEditor } from 'renderer/Components/SqlEditor/SqlEditor';
 import { cellToText } from 'renderer/Components/DataGrid/format';
-import { ident, keysWhere, literal } from 'renderer/util/sql';
+import { sqlFor } from 'renderer/util/sql';
+import type { DatabaseType } from 'shared/db/dialects';
 
 /** how rows of a table are identified for UPDATE / DELETE */
 export type KeyInfo = {
+    jsonCols?: string[];
     cols: string[];
     /** no primary / unique key : rows are matched on every column , one at a time */
     byAll: boolean;
 };
 
 export const keyInfoFor = (schema: ColSchema[]): KeyInfo => {
+    const jsonCols = schema.filter((c) => /^jsonb?\b/i.test(c.Type)).map((c) => c.FieldName);
     const pk = schema.filter((c) => c.IsPrimaryKey).map((c) => c.FieldName);
     if (pk.length) {
-        return { cols: pk, byAll: false };
+        return { cols: pk, byAll: false, jsonCols };
     }
     const unique = schema.find((c) => c.IsUnique && !c.NullAllowed);
     if (unique) {
-        return { cols: [unique.FieldName], byAll: false };
+        return { cols: [unique.FieldName], byAll: false, jsonCols };
     }
-    return { cols: schema.map((c) => c.FieldName), byAll: true };
+    return { cols: schema.map((c) => c.FieldName), byAll: true, jsonCols };
 };
 
 export const pick = (row: any, cols: string[]) =>
@@ -33,12 +36,13 @@ const BATCH = 500;
 
 const more = (n: number, what: string) => (n > 0 ? `\n-- … and ${n.toLocaleString()} more ${what}` : '');
 
-export function deleteSQL(table: string, keys: Record<string, any>[], key: KeyInfo) {
+export function deleteSQL(table: string, keys: Record<string, any>[], key: KeyInfo, dialect: DatabaseType = 'mysql') {
+    const { table: ident, keysWhere } = sqlFor(dialect,key.jsonCols);
     if (key.byAll) {
         return (
             keys
                 .slice(0, PREVIEW_ROWS)
-                .map((k) => `DELETE FROM ${ident(table)} WHERE ${keysWhere([k])} LIMIT 1;`)
+                .map((k) => dialect === 'postgres' ? `DELETE FROM ${ident(table)} WHERE (tableoid,ctid) IN (SELECT tableoid,ctid FROM ${ident(table)} WHERE ${keysWhere([k])} LIMIT 1 FOR UPDATE);` : `DELETE FROM ${ident(table)} WHERE ${keysWhere([k])} LIMIT 1;`)
                 .join('\n') + more(keys.length - PREVIEW_ROWS, 'statements (one per row)')
         );
     }
@@ -49,7 +53,8 @@ export function deleteSQL(table: string, keys: Record<string, any>[], key: KeyIn
     )}`;
 }
 
-const assignmentSQL = (a: ColumnAssignment) => {
+const assignmentSQL = (a: ColumnAssignment, dialect: DatabaseType = 'mysql') => {
+    const { ident, literal } = sqlFor(dialect);
     switch (a.mode) {
         case 'null':
             return `${ident(a.column)} = NULL`;
@@ -66,14 +71,16 @@ export function updateSQL(
     table: string,
     set: ColumnAssignment[],
     keys: Record<string, any>[],
-    key: KeyInfo
+    key: KeyInfo,
+    dialect: DatabaseType = 'mysql'
 ) {
-    const head = `UPDATE ${ident(table)}\nSET ${set.map(assignmentSQL).join(',\n    ')}`;
+    const { table: ident, keysWhere } = sqlFor(dialect,key.jsonCols);
+    const head = `UPDATE ${ident(table)}\nSET ${set.map((a) => assignmentSQL(a,dialect)).join(',\n    ')}`;
     if (key.byAll) {
         return (
             keys
                 .slice(0, PREVIEW_ROWS)
-                .map((k) => `${head}\nWHERE ${keysWhere([k])} LIMIT 1;`)
+                .map((k) => dialect === 'postgres' ? `${head}\nWHERE (tableoid,ctid) IN (SELECT tableoid,ctid FROM ${ident(table)} WHERE ${keysWhere([k])} LIMIT 1 FOR UPDATE);` : `${head}\nWHERE ${keysWhere([k])} LIMIT 1;`)
                 .join('\n\n') + more(keys.length - PREVIEW_ROWS, 'statements (one per row)')
         );
     }
@@ -81,12 +88,14 @@ export function updateSQL(
     return `${head}\nWHERE ${keysWhere(shown)};${more(keys.length - shown.length, `rows , sent in batches of ${BATCH}`)}`;
 }
 
-export function insertSQL(table: string, columns: string[], rows: any[]) {
+export function insertSQL(table: string, columns: string[], rows: any[], dialect: DatabaseType = 'mysql', schema: ColSchema[] = []) {
+    const { ident, table: tableIdent, literal } = sqlFor(dialect);
     if (!rows.length) {
         return '';
     }
-    const values = rows.map((r) => `  (${columns.map((c) => literal(r[c])).join(', ')})`);
-    return `INSERT INTO ${ident(table)} (${columns.map(ident).join(', ')})\nVALUES\n${values.join(',\n')};`;
+    if (!columns.length && dialect === 'postgres') return rows.map(() => `INSERT INTO ${tableIdent(table)} DEFAULT VALUES;`).join('\n');
+    const values = rows.map((r) => `  (${columns.map((c) => literal(dialect === 'postgres' && /^jsonb?\b/i.test(schema.find((s) => s.FieldName === c)?.Type || '') && r[c] !== null ? JSON.stringify(r[c]) : r[c])).join(', ')})`);
+    return `INSERT INTO ${tableIdent(table)} (${columns.map(ident).join(', ')})\nVALUES\n${values.join(',\n')};`;
 }
 
 const csvCell = (v: any, sep: string) => {
@@ -103,10 +112,10 @@ const csvCell = (v: any, sep: string) => {
 
 export type CopyFormat = 'sql' | 'csv' | 'tsv' | 'json';
 
-export function rowsAs(format: CopyFormat, table: string, columns: string[], rows: any[]): string {
+export function rowsAs(format: CopyFormat, table: string, columns: string[], rows: any[], dialect: DatabaseType = 'mysql', schema: ColSchema[] = []): string {
     switch (format) {
         case 'sql':
-            return insertSQL(table, columns, rows);
+            return insertSQL(table, columns, rows,dialect,schema);
         case 'json':
             return JSON.stringify(
                 rows.map((r) =>

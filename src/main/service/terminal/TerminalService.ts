@@ -1,6 +1,7 @@
 import { WebContents } from 'electron';
 import { clampSize, TerminalProcess } from '../../util/terminal/TerminalProcess';
 import { MySQLProfile } from './MySQLProfile';
+import { PostgresProfile } from './PostgresProfile';
 import { Launched, ShellProfile, TerminalProfile, TerminalProfileId } from './profiles';
 
 export type TerminalCreateInput = {
@@ -42,7 +43,7 @@ export class TerminalService {
 
     static Default(): TerminalService {
         if (!TerminalService._instance) {
-            TerminalService._instance = new TerminalService([new ShellProfile(), new MySQLProfile()]);
+            TerminalService._instance = new TerminalService([new ShellProfile(), new MySQLProfile(), new PostgresProfile()]);
         }
         return TerminalService._instance;
     }

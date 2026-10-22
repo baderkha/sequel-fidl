@@ -1,7 +1,8 @@
 import * as monaco from 'monaco-editor';
+import { DatabaseType,quoteIdentifier,quoteTable } from 'shared/db/dialects';
 import { format } from 'sql-formatter';
 import type { AppTheme } from 'renderer/theme/themes';
-import { analyze, quoteIdent, TableRef } from './sqlContext';
+import { analyze, quoteIdent as mysqlQuoteIdent, TableRef } from './sqlContext';
 
 export { monaco };
 
@@ -51,25 +52,27 @@ const FUNCTIONS = [
     'CAST', 'CONVERT', 'JSON_EXTRACT', 'JSON_OBJECT', 'JSON_ARRAY', 'UUID',
 ];
 
-let registered = false;
+const registered = new Set<DatabaseType>();
 
 /**
  * Register the formatter + completion providers , only once per window
  */
-export function registerSqlFeatures() {
-    if (registered) {
+export function registerSqlFeatures(dialect: DatabaseType = 'mysql') {
+    const language = dialect === 'postgres' ? 'pgsql' : 'mysql';
+    const quoteIdent = (name: string) => dialect === 'postgres' ? quoteIdentifier(name,dialect) : mysqlQuoteIdent(name);
+    if (registered.has(dialect)) {
         return;
     }
-    registered = true;
+    registered.add(dialect);
 
     const formatSql = (text: string, tabSize: number) =>
         format(text, {
-            language: 'mysql',
+            language: dialect === 'postgres' ? 'postgresql' : 'mysql',
             keywordCase: 'upper',
             tabWidth: tabSize,
         });
 
-    monaco.languages.registerDocumentFormattingEditProvider(SQL_LANGUAGE, {
+    monaco.languages.registerDocumentFormattingEditProvider(language, {
         provideDocumentFormattingEdits: (model, options) => [
             {
                 range: model.getFullModelRange(),
@@ -78,7 +81,7 @@ export function registerSqlFeatures() {
         ],
     });
 
-    monaco.languages.registerDocumentRangeFormattingEditProvider(SQL_LANGUAGE, {
+    monaco.languages.registerDocumentRangeFormattingEditProvider(language, {
         provideDocumentRangeFormattingEdits: (model, range, options) => [
             {
                 range,
@@ -87,11 +90,11 @@ export function registerSqlFeatures() {
         ],
     });
 
-    monaco.languages.registerCompletionItemProvider(SQL_LANGUAGE, {
+    monaco.languages.registerCompletionItemProvider(language, {
         // `.` for alias.column , space only matters right after FROM / JOIN ... (see below)
         triggerCharacters: ['.', ' ', '('],
         provideCompletionItems: async (model, position, context) => {
-            const ctx = analyze(model.getValue(), model.getOffsetAt(position));
+            const ctx = analyze(model.getValue(), model.getOffsetAt(position),dialect);
             // polite : a space only opens the list where a table name is expected
             if (
                 context.triggerKind === monaco.languages.CompletionTriggerKind.TriggerCharacter &&
@@ -104,14 +107,14 @@ export function registerSqlFeatures() {
             const range = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
             const { tables, getColumns } = completionSource;
             const Kind = monaco.languages.CompletionItemKind;
-            const known = (name: string) => tables.find((t) => t.name.toLowerCase() === name.toLowerCase());
+            const known = (name: string) => tables.find((t) => t.name.toLowerCase() === (dialect === 'postgres' ? name.replace(/^public\./,'') : name).toLowerCase());
 
             const tableItems = (prefix: string): monaco.languages.CompletionItem[] =>
                 tables.map((t) => ({
                     label: { label: t.name, description: t.type },
                     kind: t.type === 'view' ? Kind.Interface : Kind.Struct,
                     detail: t.type,
-                    insertText: quoteIdent(t.name),
+                    insertText: dialect === 'postgres' ? quoteTable(t.name,dialect) : quoteIdent(t.name),
                     filterText: t.name,
                     sortText: `${prefix}${t.name}`,
                     range,
@@ -126,7 +129,7 @@ export function registerSqlFeatures() {
                     range,
                 }));
             const functionItems = (): monaco.languages.CompletionItem[] =>
-                FUNCTIONS.map((f) => ({
+                (dialect === 'postgres' ? ['COUNT','SUM','AVG','MIN','MAX','COALESCE','NULLIF','STRING_AGG','ARRAY_AGG','JSONB_AGG','JSONB_BUILD_OBJECT','TO_CHAR','DATE_TRUNC','EXTRACT','NOW','GENERATE_SERIES','LENGTH','LOWER','UPPER','ROUND','CAST','UNNEST'] : FUNCTIONS).map((f) => ({
                     label: `${f}()`,
                     kind: Kind.Function,
                     insertText: `${f}($0)`,
@@ -152,7 +155,7 @@ export function registerSqlFeatures() {
                             label: { label: c.name, detail: c.pk ? '  🔑' : '', description: `${c.type} · ${owner}` },
                             kind: c.pk ? Kind.Constant : Kind.Field,
                             detail: `${c.type}${c.pk ? ' · primary key' : ''} · ${ref.table}`,
-                            insertText: ambiguous ? `${quoteIdent(owner)}.${quoteIdent(c.name)}` : quoteIdent(c.name),
+                            insertText: ambiguous ? `${dialect === 'postgres' && !ref.alias ? quoteTable(owner,dialect) : quoteIdent(owner)}.${quoteIdent(c.name)}` : quoteIdent(c.name),
                             filterText: c.name,
                             // primary key first , then the table's own column order
                             sortText: `0${i}${c.pk ? '0' : '1'}${`${ordinal}`.padStart(4, '0')}`,
@@ -167,7 +170,7 @@ export function registerSqlFeatures() {
                 case 'none':
                     break;
                 case 'start':
-                    suggestions = keywordItems(STATEMENT_KEYWORDS, '0');
+                    suggestions = keywordItems(dialect === 'postgres' ? STATEMENT_KEYWORDS.filter((k) => !/^(SHOW|USE|DESCRIBE)/.test(k)) : STATEMENT_KEYWORDS, '0');
                     break;
                 case 'table':
                     suggestions = tableItems('0');

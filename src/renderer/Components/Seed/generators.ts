@@ -145,6 +145,7 @@ export const GENERATORS: Generator[] = [
         make: (p) =>
             faker.number.float({ min: p.min ?? 0, max: p.max ?? 1000, fractionDigits: p.decimals ?? 2 }),
     },
+    { id:'array',label:'Text array',group:'Identifiers',make:() => [faker.lorem.word(),faker.lorem.word()] },
     { id: 'boolean', label: 'Boolean (0 / 1)', group: 'Numbers', make: () => (faker.datatype.boolean() ? 1 : 0) },
 
     { id: 'pastDate', label: 'Date in the past', group: 'Dates', make: () => faker.date.past({ years: 3 }) },
@@ -171,7 +172,7 @@ export const GENERATOR_GROUPS = Array.from(new Set(GENERATORS.map((g) => g.group
  * @param c
  */
 export function columnInfo(c: ColSchema): ColumnInfo {
-    const raw = (c.Type || '').toLowerCase();
+    const raw = (c.Type || '').toLowerCase().replace(/^character varying/,'varchar');
     const m = raw.match(/^(\w+)(?:\((.*)\))?/);
     const base = m ? m[1] : raw;
     const args = m && m[2] ? m[2] : '';
@@ -217,7 +218,7 @@ const INT_MAX: Record<string, number> = {
 const isText = (b: string) => /char|text|blob|binary/.test(b);
 const isInt = (b: string) => b in INT_MAX;
 const isDecimal = (b: string) => /decimal|numeric|float|double|real/.test(b);
-const isDateish = (b: string) => /^(date|datetime|timestamp)$/.test(b);
+const isDateish = (b: string) => /^(date|datetime|timestamp|timestamptz)$/.test(b);
 
 export type Suggestion = { gen: string; params: GenParams };
 
@@ -235,6 +236,8 @@ export function suggest(
     const n = col.name.toLowerCase();
     const s = (gen: string, params: GenParams = {}): Suggestion => ({ gen, params });
 
+    if (/\[\]$/.test(col.type)) return s(col.hasDefault ? 'skip' : 'array');
+    if (col.base === 'uuid') return s('uuid');
     if (col.autoIncrement || col.generated) return s('skip');
     if (fk) return s('lookup', fk);
     if (col.enumValues.length) return s('choice', { choices: col.enumValues.join(', ') });
@@ -297,7 +300,7 @@ export function suggest(
     if (col.base === 'date') return s('pastDate');
     if (isDateish(col.base)) return s(/expire|due|until|end/.test(n) ? 'futureDate' : 'pastDate');
     if (col.base === 'time') return s('time');
-    if (col.base === 'json') return s('json');
+    if (/^jsonb?$/.test(col.base)) return s('json');
     if (/blob|binary/.test(col.base)) return s(col.nullable ? 'null' : 'constant', { value: '' });
     if (/text/.test(col.base)) return s('paragraph');
     if (col.base === 'char') return s('alphanumeric', { length: col.length || 1 });
@@ -326,6 +329,8 @@ export function castValue(v: any, col: ColumnInfo): any {
         if (isDateish(col.base)) return sqlDateTime(v);
         return sqlDateTime(v);
     }
+    if (col.base === 'boolean' || col.base === 'bool') return Boolean(v);
+    if (/\[\]$/.test(col.type)) return Array.isArray(v) ? v : [v];
     if (typeof v === 'object') {
         return JSON.stringify(v);
     }

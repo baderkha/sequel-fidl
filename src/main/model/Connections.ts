@@ -1,8 +1,8 @@
-import { Dialect } from 'sequelize';
+import type { DatabaseType } from '../../shared/db/dialects';
 import { DataTypes } from 'sequelize';
 import { SqlizeModelIndexed } from '../util/store/model/SequelizeModelIndexed';
 
-export type DBType = Dialect;
+export type DBType = DatabaseType;
 
 /**
  * Connection Config

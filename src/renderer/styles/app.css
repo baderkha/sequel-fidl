@@ -643,6 +643,44 @@ body.is-resizing * {
 .grid-body {
     position: relative;
 }
+.grid-draft-row {
+    display: flex;
+    position: sticky;
+    top: 30px;
+    z-index: 3;
+    min-height: 64px;
+    background: var(--surface);
+    border-bottom: 2px solid var(--accent);
+}
+.grid-draft-row .grid-gutter { color: var(--accent); }
+.grid-draft-cell {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    padding: 4px;
+    border-right: 1px solid var(--border);
+    background: var(--accent-soft);
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+.grid-draft-cell .grid-cell-editor {
+    position: static;
+    flex: 1;
+    min-height: 26px;
+    width: 100%;
+    resize: vertical;
+}
+.grid-draft-cell select {
+    width: 100%;
+    border: 0;
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 10px;
+}
+.grid-draft-generated { padding: 0 6px; color: var(--text-muted); font-size: 11px; }
+.record-insert-bar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--border); }
 .grid-row {
     position: absolute;
     left: 0;
@@ -1313,7 +1351,7 @@ input[type='checkbox'].is-invalid {
 .ct-row {
     display: grid;
     grid-template-columns:
-        24px minmax(130px, 1.3fr) 120px 110px 44px 40px 36px 40px
+        24px minmax(130px, 1.3fr) 120px 110px 44px 40px 36px 110px
         minmax(220px, 1.6fr) 52px minmax(110px, 1fr) 76px;
     align-items: center;
     gap: 6px;
@@ -1376,6 +1414,7 @@ input[type='checkbox'].is-invalid {
     gap: 8px;
     padding: 12px 0 4px 30px;
 }
+.ct-auto-increment-note { margin: 10px 0 0 30px; }
 .ct-card {
     display: flex;
     flex-direction: column;

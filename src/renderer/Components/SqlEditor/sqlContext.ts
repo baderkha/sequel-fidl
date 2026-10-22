@@ -34,32 +34,54 @@ const CLAUSE_KEYWORDS = new Set([
 ]);
 
 /** blank out strings and comments (same length) so offsets stay valid */
-export function maskSql(sql: string): { masked: string; openString: boolean } {
+export function maskSql(sql: string, dialect: 'mysql' | 'postgres' = 'mysql'): { masked: string; openString: boolean } {
     let out = '';
     let i = 0;
     let open = false;
     while (i < sql.length) {
         const ch = sql[i];
         const next = sql[i + 1];
-        if (ch === "'" || ch === '"') {
+        const dollar = dialect === 'postgres' && ch === '$' ? sql.slice(i).match(/^\$(?:[a-zA-Z_][a-zA-Z_0-9]*)?\$/)?.[0] : null;
+        if (dollar) {
+            const close = sql.indexOf(dollar,i+dollar.length);
+            const end = close < 0 ? sql.length : close+dollar.length;
+            if (close < 0) open = true;
+            out += ' '.repeat(end-i);
+            i = end;
+        } else if (dialect === 'postgres' && ch === '"') {
+            let j = i+1;
+            while (j < sql.length) {
+                if (sql[j] === '"' && sql[j+1] === '"') j += 2;
+                else if (sql[j] === '"') { j++; break; }
+                else j++;
+            }
+            out += sql.slice(i,j);
+            i = j;
+        } else if (ch === "'" || ch === '"') {
+            const escapes = dialect === 'mysql' || (ch === "'" && /[eE]/.test(sql[i-1] || ''));
             let j = i + 1;
             while (j < sql.length && sql[j] !== ch) {
-                if (sql[j] === '\\') j++;
+                if (sql[j] === '\\' && escapes) j++;
                 j++;
             }
             if (j >= sql.length) open = true;
             out += ch + ' '.repeat(Math.max(0, Math.min(j, sql.length) - i - 1)) + (j < sql.length ? ch : '');
             i = j + 1;
-        } else if ((ch === '-' && next === '-') || ch === '#') {
+        } else if ((ch === '-' && next === '-') || (dialect === 'mysql' && ch === '#')) {
             let j = i;
             while (j < sql.length && sql[j] !== '\n') j++;
             if (j >= sql.length) open = true;
             out += ' '.repeat(j - i);
             i = j;
         } else if (ch === '/' && next === '*') {
-            const close = sql.indexOf('*/', i + 2);
-            const end = close < 0 ? sql.length : close + 2;
-            if (close < 0) open = true;
+            let end = i+2;
+            let depth = 1;
+            while (end < sql.length && depth) {
+                if (dialect === 'postgres' && sql.slice(end,end+2) === '/*') { depth++; end += 2; }
+                else if (sql.slice(end,end+2) === '*/') { depth--; end += 2; }
+                else end++;
+            }
+            if (depth) open = true;
             out += ' '.repeat(end - i);
             i = end;
         } else {
@@ -70,15 +92,20 @@ export function maskSql(sql: string): { masked: string; openString: boolean } {
     return { masked: out, openString: open };
 }
 
-const unquote = (s: string) => s.replace(/^`|`$/g, '');
+const unquote = (s: string) => s.replace(/^`|`$|^"|"$/g, '').replace(/""/g,'"').replace(/``/g,'`');
+const IDENT = '`(?:``|[^`])+`|"(?:""|[^"])+"|[\\w$]+';
+const tableName = (raw: string, dialect: 'mysql' | 'postgres') => {
+    const parts = raw.match(new RegExp(IDENT,'g')) || [];
+    return dialect === 'postgres' ? parts.map(unquote).join('.') : unquote(parts[parts.length-1] || '');
+};
 
 /**
  * Tables a statement references , with aliases
  * handles `FROM a x , b AS y JOIN c ON ...` , `UPDATE t` , `INSERT INTO t` , `DELETE FROM t`
  */
-export function tablesInStatement(masked: string): TableRef[] {
+export function tablesInStatement(masked: string, dialect: 'mysql' | 'postgres' = 'mysql'): TableRef[] {
     const refs: TableRef[] = [];
-    const ident = '`[^`]+`|[\\w$]+';
+    const ident = IDENT;
     const re = new RegExp(
         `\\b(from|join|update|into)\\s+((?:${ident})(?:\\.(?:${ident}))?)(?:\\s+(?:as\\s+)?(${ident}))?`,
         'gi'
@@ -87,11 +114,11 @@ export function tablesInStatement(masked: string): TableRef[] {
     while ((m = re.exec(masked))) {
         const kw = m[1].toLowerCase();
         const rawTable = m[2].split('.').pop();
-        const table = unquote(rawTable);
+        const table = tableName(m[2],dialect);
         let alias = m[3] ? unquote(m[3]) : undefined;
-        if (alias && !m[3].startsWith('`') && CLAUSE_KEYWORDS.has(alias.toLowerCase())) alias = undefined;
+        if (alias && !/^[`"]/.test(m[3]) && CLAUSE_KEYWORDS.has(alias.toLowerCase())) alias = undefined;
         // `order` in backticks is a table , bare ORDER is a keyword
-        const quoted = rawTable.startsWith('`');
+        const quoted = /^[`"]/.test(rawTable);
         if (table && (quoted || !CLAUSE_KEYWORDS.has(table.toLowerCase()))) refs.push({ table, alias });
         // comma separated FROM list
         if (kw === 'from') {
@@ -127,36 +154,36 @@ function statementBounds(masked: string, offset: number): [number, number] {
  * @param text whole editor text
  * @param offset cursor offset
  */
-export function analyze(text: string, offset: number): SqlContext {
-    const { masked } = maskSql(text);
+export function analyze(text: string, offset: number, dialect: 'mysql' | 'postgres' = 'mysql'): SqlContext {
+    const { masked } = maskSql(text,dialect);
     const [start, end] = statementBounds(masked, offset);
     const statement = masked.slice(start, end);
     const before = masked.slice(start, offset);
-    const scope = tablesInStatement(statement);
+    const scope = tablesInStatement(statement,dialect);
 
     // inside a string or comment : the masked text differs from the real one at the cursor
-    const { openString } = maskSql(text.slice(start, offset));
+    const { openString } = maskSql(text.slice(start, offset),dialect);
     if (openString) {
         return { kind: 'none', scope };
     }
 
     // alias.partial
-    const dot = before.match(/(`[^`]+`|[\w$]+)\.([\w$]*)$/);
+    const dot = before.match(new RegExp(`(${IDENT})\\.([\\w$]*)$`));
     if (dot) {
         return { kind: 'qualified', qualifier: unquote(dot[1]), scope };
     }
 
     // drop the word being typed , then look at what precedes it
     const head = before.replace(/[\w$`]*$/, '');
-    const tokens = head.match(/`[^`]*`|[\w$]+|[(),=<>!+\-*/]+/g) || [];
+    const tokens = head.match(new RegExp(`${IDENT}|[(),=<>!+\\-*/]+`,'g')) || [];
     if (!tokens.length) {
         return { kind: 'start', scope };
     }
 
     // INSERT INTO t ( ... | )
-    const insert = head.match(/\binsert\s+(?:ignore\s+)?into\s+(`[^`]+`|[\w$]+)\s*\(([^)]*)$/i);
+    const insert = head.match(new RegExp(`\\binsert\\s+(?:ignore\\s+)?into\\s+((?:${IDENT})(?:\\.(?:${IDENT}))?)\\s*\\(([^)]*)$`,'i'));
     if (insert) {
-        return { kind: 'insert-columns', insertTable: unquote(insert[1]), scope };
+        return { kind: 'insert-columns', insertTable: tableName(insert[1],dialect), scope };
     }
 
     const last = tokens[tokens.length - 1].toLowerCase();

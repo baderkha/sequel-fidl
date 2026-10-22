@@ -7,6 +7,8 @@ import { BASE_APP_DATA_PATH } from '../util/application/path';
 import { broadcast } from '../util/broadcast';
 import { DEFAULT_GENERATED_DB_NAME, IDBProcess } from '../util/db_process';
 import { MYSQLDocker } from '../util/db_process/MYSQL';
+import { PostgresDocker } from '../util/db_process/Postgres';
+import { DATABASES, DatabaseType, databaseType } from '../../shared/db/dialects';
 import { DockerAPI } from '../util/docker/DockerRunnerImpl';
 import { ContainerState } from '../util/docker/DockerRunner';
 import { encryptSecret, decryptSecret } from '../util/secrets';
@@ -31,6 +33,7 @@ export const PLAYGROUND_PROGRESS_EV = 'playground_progress';
 export const CONNECTION_CLOSED_EV = 'connection_closed';
 
 export type PlaygroundInfo = {
+    type: DatabaseType;
     id: number;
     name: string;
     version: string;
@@ -51,6 +54,7 @@ export type PlaygroundInfo = {
 };
 
 export type NewPlaygroundInput = {
+    type?: DatabaseType;
     name: string;
     version: string;
     /** sample database to import on first start */
@@ -59,7 +63,7 @@ export type NewPlaygroundInput = {
 };
 
 /**
- * Playgrounds : app managed mysql instances.
+ * Playgrounds : app managed database instances.
  * The data folder is the playground , the docker container is disposable and only exists
  * while the playground is in use. Stopping keeps the data , deleting removes it.
  * @author Ahmad Baderkhan
@@ -67,18 +71,18 @@ export type NewPlaygroundInput = {
 export class PlaygroundService {
     private static _instance: PlaygroundService;
     private repo: PlaygroudConnectionsRepoSQLite;
-    private proc: IDBProcess;
+    private processes: Map<DatabaseType, IDBProcess>;
     private conMgr: ConManager;
     /** playground id => what it's doing right now */
     private busy = new Map<number, string>();
 
     constructor(
         repo: PlaygroudConnectionsRepoSQLite,
-        proc: IDBProcess,
+        proc: IDBProcess | Map<DatabaseType, IDBProcess>,
         conMgr: ConManager
     ) {
         this.repo = repo;
-        this.proc = proc;
+        this.processes = proc instanceof Map ? proc : new Map([['mysql', proc]]);
         this.conMgr = conMgr;
     }
 
@@ -89,7 +93,10 @@ export class PlaygroundService {
                     new PlaygroundConnection(),
                     GetPersistentDBConnection()
                 ),
-                new MYSQLDocker(DockerAPI.Default(), BASE_APP_DATA_PATH),
+                new Map<DatabaseType, IDBProcess>([
+                    ['mysql', new MYSQLDocker(DockerAPI.Default(), BASE_APP_DATA_PATH)],
+                    ['postgres', new PostgresDocker(DockerAPI.Default(), BASE_APP_DATA_PATH)],
+                ]),
                 ConManager.GetInstance()
             );
         }
@@ -97,7 +104,13 @@ export class PlaygroundService {
     }
 
     DockerAvailable(): Promise<boolean> {
-        return this.proc.IsAvailable();
+        return this.processes.values().next().value.IsAvailable();
+    }
+
+    private process(type?: string): IDBProcess {
+        const proc = this.processes.get(databaseType(type));
+        if (!proc) throw new Error(`Unsupported database type: ${type}`);
+        return proc;
     }
 
     private progress(id: number, message: string) {
@@ -121,8 +134,9 @@ export class PlaygroundService {
     }
 
     private async info(pg: PlaygroundConnection): Promise<PlaygroundInfo> {
-        const state = await this.proc.State(pg.containerName);
+        const state = await this.process(pg.type).State(pg.containerName);
         return {
+            type: databaseType(pg.type),
             id: pg.id,
             name: pg.name,
             version: pg.version,
@@ -157,31 +171,29 @@ export class PlaygroundService {
     async Create(input: NewPlaygroundInput): Promise<ErrorTuple<PlaygroundInfo>> {
         const key = v4();
         try {
-            let res = await this.repo.FindAll();
-            console.log(res.length ? res[0] : null)
-            const val = await this.repo.FindManyByCondition([{
-                col : "port",
-                op : ComparisonOperation.EQ,
-                value : input.port
-            }])
-            if (val.length > 0) {
-                return NewErrorTuple(null,new Error(`This port is already taken by Playground:"${val[0].name}"`,));
+            const type = databaseType(input.type);
+            const engine = DATABASES[type];
+            const sample = getSample(input.sample || '');
+            if (sample && sample.type !== type) return NewErrorTuple(null, new Error('The sample belongs to a different database engine.'));
+            if (input.port && (!Number.isInteger(input.port) || input.port < 1 || input.port > 65535)) return NewErrorTuple(null, new Error('Choose a port between 1 and 65535.'));
+            if (input.port) {
+                const existing = await this.repo.FindManyByCondition([{ col: 'port', op: ComparisonOperation.EQ, value: input.port }]);
+                if (existing.length) return NewErrorTuple(null, new Error(`Port is already assigned to playground "${existing[0].name}".`));
             }
             const row: any = await this.repo.getDb().create({
                 name: input.name.trim() || this.generateRandomName(input.version.trim()),
-                type: 'mysql',
+                type,
                 version: input.version.trim() || 'latest',
                 containerName: `sequel-fidl-pg-${key}`,
                 sandboxFolderPath: path.join(PLAYGROUNDS_PATH, key),
-                username: 'root',
-                password: encryptSecret('root'),
+                username: engine.username,
+                password: encryptSecret(engine.username),
                 port: input.port ? input.port : 0,
                 defaultDB: DEFAULT_GENERATED_DB_NAME,
-                sample: getSample(input.sample || '') ? input.sample : '',
+                sample: sample?.id || '',
                 seeded: false,
             });
 
-            console.log(row)
 
             return NewErrorTuple(
                 await this.info(row.get({ plain: true }) as PlaygroundConnection),
@@ -212,17 +224,20 @@ export class PlaygroundService {
         if (!pg) {
             return NewErrorTuple(null, new Error(`Playground ${id} not found`));
         }
+        const type = databaseType(pg.type);
+        const engine = DATABASES[type];
+        const proc = this.process(type);
         try {
             let port = pg.port;
-            if ((await this.proc.State(pg.containerName)) !== 'running') {
-                if (!(await this.proc.IsAvailable())) {
+            if ((await this.process(pg.type).State(pg.containerName)) !== 'running') {
+                if (!(await proc.IsAvailable())) {
                     return NewErrorTuple(
                         null,
                         new Error('Docker is not running. Start Docker Desktop and try again.')
                     );
                 }
-                this.progress(id, `Starting MySQL ${pg.version}…`);
-                const [out, err] = await this.proc.StartUpFromExisting(
+                this.progress(id, `Starting ${engine.label} ${pg.version}…`);
+                const [out, err] = await proc.StartUpFromExisting(
                     pg.sandboxFolderPath,
                     pg.version,
                     pg.containerName,
@@ -239,7 +254,7 @@ export class PlaygroundService {
                 await this.repo.getDb().update({ port }, { where: { id } });
             }
 
-            this.progress(id, 'Waiting for MySQL to accept connections…');
+            this.progress(id, `Waiting for ${engine.label} to accept connections…`);
             const cfg = {
                 host: '127.0.0.1',
                 port,
@@ -248,13 +263,13 @@ export class PlaygroundService {
                 database: pg.defaultDB,
             };
             let [con, err] = await CreateConnection(
-                'mysql',
+                type,
                 cfg,
                 BOOT_TIMEOUT_MS,
                 (elapsed) =>
                     this.progress(
                         id,
-                        `Waiting for MySQL to accept connections… ${Math.round(elapsed / 1000)}s`
+                        `Waiting for ${engine.label} to accept connections… ${Math.round(elapsed / 1000)}s`
                     )
             );
             if (err) {
@@ -264,22 +279,20 @@ export class PlaygroundService {
             // first start of a playground created with sample data
             const sample = getSample(pg.sample || '');
             if (sample && !pg.seeded) {
-                this.progress(id, `Downloading the ${sample.name} sample…`);
-                const archive = await fetchSample(sample).catch((e: Error) => e);
-                if (archive instanceof Error) {
-                    await con.close().catch(() => {});
-                    return NewErrorTuple(
-                        null,
-                        new Error(`Couldn't download the ${sample.name} sample: ${archive.message}`)
-                    );
-                }
                 this.progress(id, `Importing ${sample.name}…`);
-                const importErr = await this.proc.ImportArchive(
-                    pg.containerName,
-                    archive,
-                    sample.files,
-                    sample.database
-                );
+                let importErr: Error | null = null;
+                if (sample.sql) {
+                    try {
+                        await con.transaction((transaction) => con.query(sample.sql, { transaction }));
+                    } catch (e) { importErr = e as Error; }
+                } else {
+                    const archive = await fetchSample(sample).catch((e: Error) => e);
+                    if (archive instanceof Error) {
+                        await con.close().catch(() => {});
+                        return NewErrorTuple(null, new Error(`Couldn't download ${sample.name}: ${archive.message}`));
+                    }
+                    importErr = await proc.ImportArchive(pg.containerName, archive, sample.files, sample.database);
+                }
                 if (importErr) {
                     await con.close().catch(() => {});
                     return NewErrorTuple(
@@ -292,7 +305,7 @@ export class PlaygroundService {
                     .update({ seeded: true, defaultDB: sample.database }, { where: { id } });
                 // reopen on the sample database
                 await con.close().catch(() => {});
-                [con, err] = await CreateConnection('mysql', { ...cfg, database: sample.database }, 0);
+                [con, err] = await CreateConnection(type, { ...cfg, database: sample.database }, 0);
                 if (err) {
                     return NewErrorTuple(null, err);
                 }
@@ -328,7 +341,7 @@ export class PlaygroundService {
                 await this.conMgr.Remove(s.conID, true);
                 broadcast(CONNECTION_CLOSED_EV, { conID: s.conID, reason: 'Playground stopped' });
             }
-            await this.proc.ShutDown(pg.containerName);
+            await this.process(pg.type).ShutDown(pg.containerName);
             return null;
         } finally {
             this.progress(id, '');
@@ -348,7 +361,7 @@ export class PlaygroundService {
         if (err) {
             return err;
         }
-        await this.proc.DeleteState(pg.sandboxFolderPath);
+        await this.process(pg.type).DeleteState(pg.sandboxFolderPath);
         return this.repo.DeleteByIndex({ id });
     }
 

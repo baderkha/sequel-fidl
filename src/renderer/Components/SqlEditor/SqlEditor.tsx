@@ -1,4 +1,5 @@
 import React from 'react';
+import { useDatabaseDialect } from 'renderer/database/DialectContext';
 import { useTheme } from 'renderer/theme/ThemeProvider';
 import {
     applyMonacoTheme,
@@ -6,7 +7,6 @@ import {
     monaco,
     registerSqlFeatures,
     setCompletionSource,
-    SQL_LANGUAGE,
 } from './monacoSetup';
 import { splitStatements, statementAt } from './statements';
 
@@ -38,6 +38,7 @@ const FLASH_MS = 700;
  */
 export const SqlEditor = React.forwardRef<SqlEditorHandle, SqlEditorProps>(
     function SqlEditor(p, ref) {
+        const dialect = useDatabaseDialect();
         const hostRef = React.useRef<HTMLDivElement>(null);
         const editorRef = React.useRef<monaco.editor.IStandaloneCodeEditor>(null);
         const { theme } = useTheme();
@@ -46,11 +47,11 @@ export const SqlEditor = React.forwardRef<SqlEditorHandle, SqlEditorProps>(
         props.current = p;
 
         React.useEffect(() => {
-            registerSqlFeatures();
+            registerSqlFeatures(dialect);
             applyMonacoTheme(theme);
             const editor = monaco.editor.create(hostRef.current, {
                 value: p.value,
-                language: SQL_LANGUAGE,
+                language: dialect === 'postgres' ? 'pgsql' : 'mysql',
                 readOnly: p.readOnly,
                 automaticLayout: true,
                 fontFamily: "'SF Mono', 'JetBrains Mono', Menlo, Monaco, monospace",
@@ -124,6 +125,12 @@ export const SqlEditor = React.forwardRef<SqlEditorHandle, SqlEditorProps>(
             }
         }, [p.completion]);
 
+        React.useEffect(() => {
+            registerSqlFeatures(dialect);
+            const model = editorRef.current?.getModel();
+            if (model) monaco.editor.setModelLanguage(model,dialect === 'postgres' ? 'pgsql' : 'mysql');
+        },[dialect]);
+
         // external value changes (read only views , table switches)
         React.useEffect(() => {
             const editor = editorRef.current;
@@ -174,7 +181,8 @@ export const SqlEditor = React.forwardRef<SqlEditorHandle, SqlEditorProps>(
                 }
                 const stmt = statementAt(
                     model.getValue(),
-                    model.getOffsetAt(editor.getPosition())
+                    model.getOffsetAt(editor.getPosition()),
+                    dialect
                 );
                 if (!stmt) {
                     return null;
@@ -184,7 +192,7 @@ export const SqlEditor = React.forwardRef<SqlEditorHandle, SqlEditorProps>(
             },
             allStatements: () => {
                 const text = editorRef.current.getValue();
-                const stmts = splitStatements(text);
+                const stmts = splitStatements(text,dialect);
                 if (stmts.length) {
                     flash(stmts[0].start, stmts[stmts.length - 1].end);
                 }

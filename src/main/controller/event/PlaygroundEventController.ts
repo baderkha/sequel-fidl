@@ -10,7 +10,7 @@ export class RenamePlaygroundEvent extends Event<{ id: number; name: string }> {
 export const PlaygroundEventController = (e: IpcMain, ser: PlaygroundService) => {
     e.handle('docker_available', () => ser.DockerAvailable());
     e.handle('list_samples', () =>
-        SAMPLES.map(({ id, name, description, database }) => ({ id, name, description, database }))
+        SAMPLES.map(({ id, name, description, database, type }) => ({ id, name, description, database, type }))
     );
     e.handle('list_playgrounds', () => ser.List());
     e.handle('create_playground', (_, arg: NewPlaygroundEvent) => ser.Create(arg.Data));

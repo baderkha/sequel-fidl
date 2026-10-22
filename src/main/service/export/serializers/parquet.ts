@@ -114,6 +114,9 @@ function plan(c: ExportColumn, name: string, o: ParquetOptions): FieldPlan {
         case 'decimal': {
             if (o.decimals === 'string') return field('UTF8', asIs, {}, 'STRING');
             if (o.decimals === 'double') return field('DOUBLE', (v) => Number(v));
+            // PostgreSQL NUMERIC without a declared precision/scale cannot fit a
+            // fixed Parquet decimal schema. Preserve its text exactly instead.
+            if (c.precision === undefined || c.scale === undefined) return field('UTF8', asIs, {}, 'STRING (unbounded decimal)');
             const precision = c.precision || 65;
             const scale = c.scale || 0;
             const typeLength = decimalBytes(precision);

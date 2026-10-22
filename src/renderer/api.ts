@@ -1,6 +1,7 @@
 import type { DialectInfoRes } from 'main/service/SQLService';
 import type {
     ColSchema,
+    TableMetadata,
     ColumnAssignment,
     Filter,
     RowKey,
@@ -178,6 +179,8 @@ export const api = {
     listTables: (conID: string) => invoke<Table[]>('show_all_tables', { conID }),
     schema: (conID: string, tableName: string) =>
         invoke<ColSchema[]>('show_schema', { conID, tableName }),
+    tableMetadata: (conID: string, tableName: string) => invoke<TableMetadata>('table_metadata', { conID, tableName }),
+    applySchemaChanges: (conID: string, statements: string[]) => invoke<{ error?: string }>('apply_schema_changes',{ conID,statements }),
     createSQL: (conID: string, tableName: string) =>
         invoke<string>('get_create_sql', { conID, tableName }),
     selectRows: (conID: string, s: SelectInput) =>
@@ -201,7 +204,7 @@ export const api = {
     ) =>
         invoke<ErrorTuple<number>>('update_rows', { conID, tableName, set, keys, byAllColumns }),
     listSamples: () =>
-        invoke<{ id: string; name: string; description: string; database: string }[]>(
+        invoke<{ id: string; name: string; description: string; database: string; type: import('shared/db/dialects').DatabaseType }[]>(
             'list_samples',
             {}
         ),

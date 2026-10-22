@@ -127,7 +127,7 @@ const configuration: webpack.Configuration = {
       filename: 'style.css',
     }),
 
-    new MonacoWebpackPlugin({ languages: ['mysql', 'sql'] }),
+    new MonacoWebpackPlugin({ languages: ['mysql', 'pgsql', 'sql'] }),
 
     new BundleAnalyzerPlugin({
       analyzerMode: process.env.ANALYZE === 'true' ? 'server' : 'disabled',

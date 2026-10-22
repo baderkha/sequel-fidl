@@ -73,6 +73,7 @@ export function columnTypeHint(typeLabel: string) {
         case 'geometrycollection':
         case 'geography':
             return { Icon: MapPin, text: '' };
+        case 'character':
         case 'char':
         case 'varchar':
         case 'nchar':

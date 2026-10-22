@@ -7,11 +7,13 @@ import { ErrorTuple, NewErrorTuple } from '../util/tuple';
 import { ConManager } from './Connections';
 import { ConnectionConfig, CreateConnection } from './db/ConnectionFactory';
 import { SessionInfo, Sessions } from './Sessions';
+import { DATABASES, databaseType, DatabaseType } from '../../shared/db/dialects';
 
 /**
  * A saved connection as the renderer sees it , the password never leaves the main process
  */
 export type SavedConnection = {
+    type: DatabaseType;
     id: number;
     name: string;
     host: string;
@@ -22,6 +24,7 @@ export type SavedConnection = {
 };
 
 export type ConnectionInput = {
+    type?: DatabaseType;
     /** set when it's a saved connection */
     id?: number;
     name: string;
@@ -34,10 +37,11 @@ export type ConnectionInput = {
 };
 
 const toSaved = (row: any): SavedConnection => ({
+    type: databaseType(row.type),
     id: row.id,
     name: row.name,
     host: row.host,
-    port: parseInt(row.port, 10) || 3306,
+    port: parseInt(row.port, 10) || DATABASES[databaseType(row.type)].port,
     username: row.username,
     database: row.db || '',
     hasPassword: !!row.password,
@@ -82,7 +86,7 @@ export class ConnectionService {
             port: `${input.port}`,
             username: input.username,
             db: input.database || '',
-            type: 'mysql',
+            type: databaseType(input.type),
         };
         if (input.password !== undefined) {
             data.password = encryptSecret(input.password);
@@ -124,7 +128,7 @@ export class ConnectionService {
     }
 
     private async open(input: ConnectionInput): Promise<ErrorTuple<Sequelize>> {
-        return CreateConnection('mysql', await this.resolve(input), 0);
+        return CreateConnection(databaseType(input.type), await this.resolve(input), 0);
     }
 
     /**

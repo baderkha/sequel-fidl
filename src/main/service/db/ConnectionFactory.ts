@@ -1,5 +1,6 @@
 import { ErrorTuple } from '../../util/tuple';
-import { Dialect, Sequelize } from 'sequelize';
+import { Sequelize } from 'sequelize';
+import { DATABASES } from '../../../shared/db/dialects';
 import { DBType } from '../../model/Connections';
 
 const CONNECTION_TRY_BEFORE_TIMEOUT_MS = 60 * 1000;
@@ -61,16 +62,16 @@ export const CreateConnection = async (
     timeoutMs = CONNECTION_TRY_BEFORE_TIMEOUT_MS,
     onRetry?: (elapsedMs: number) => void
 ): Promise<ErrorTuple<Sequelize>> => {
-    if (type !== 'mysql') {
+    if (type !== 'mysql' && type !== 'postgres') {
         return [null, new Error('Unsupported Database Type')];
     }
-    const con = new Sequelize(cfg.database || '', cfg.username, cfg.password, {
+    const con = new Sequelize(cfg.database || DATABASES[type].database, cfg.username, cfg.password, {
         host: cfg.host || '127.0.0.1',
         port: cfg.port,
-        dialect: type as Dialect,
+        dialect: type,
         logging: false,
         pool: { max: 5, min: 0, idle: 10000 },
-        dialectOptions: {
+        dialectOptions: type === 'postgres' ? { connectionTimeoutMillis: 10000 } : {
             multipleStatements: true,
             connectTimeout: 10000,
             // keep DECIMAL / BIGINT precision

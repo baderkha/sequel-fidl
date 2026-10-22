@@ -9,6 +9,7 @@ import { ErrorTuple, NewErrorTuple } from '../../util/tuple';
  * read from the live connection so it follows database switches
  */
 export type MySQLTarget = {
+    type: 'mysql' | 'postgres';
     host: string;
     port: number;
     user: string;
@@ -22,7 +23,7 @@ export type MySQLTarget = {
     container?: string;
 };
 
-export async function resolveMySQLTarget(conID: string | null): Promise<ErrorTuple<MySQLTarget>> {
+export async function resolveDatabaseTarget(conID: string | null): Promise<ErrorTuple<MySQLTarget>> {
     const [, con] = conID ? ConManager.GetInstance().GetConById(conID) : [null, null];
     if (!con) {
         return NewErrorTuple(null, new Error('This window has no live database connection.'));
@@ -42,8 +43,9 @@ export async function resolveMySQLTarget(conID: string | null): Promise<ErrorTup
             : undefined;
     return NewErrorTuple(
         {
+            type: con.getDialect() === 'postgres' ? 'postgres' : 'mysql',
             host: cfg.host || '127.0.0.1',
-            port: Number(cfg.port) || 3306,
+            port: Number(cfg.port) || (con.getDialect() === 'postgres' ? 5432 : 3306),
             user: cfg.username || '',
             password: cfg.password || '',
             database: cfg.database || '',
@@ -53,6 +55,11 @@ export async function resolveMySQLTarget(conID: string | null): Promise<ErrorTup
         },
         null
     );
+}
+
+export async function resolveMySQLTarget(conID: string | null): Promise<ErrorTuple<MySQLTarget>> {
+    const [target,error] = await resolveDatabaseTarget(conID);
+    return target?.type === 'postgres' ? NewErrorTuple(null,new Error('Choose the PostgreSQL terminal for this connection.')) : [target,error];
 }
 
 /** "root@127.0.0.1:55001/world" */

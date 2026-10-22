@@ -15,7 +15,7 @@ I will admit I did use AI as it does a better job of cranking out the front end 
 
 <p align="center"> <img src="./assets/logo.png" /> </p>
 
-A desktop MySQL client in the spirit of Sequel Pro, with a modern dark UI and a playground for brainstorming ideas.
+A desktop MySQL and PostgreSQL client in the spirit of Sequel Pro, with a modern dark UI and a playground for brainstorming ideas.
 
 ![Browsing the sakila sample: filtered rows with a bulk action bar](docs/screenshots/content.png)
 
@@ -48,8 +48,9 @@ A desktop MySQL client in the spirit of Sequel Pro, with a modern dark UI and a 
 
 The launcher is the first window you see. Every connection opens in its own window, so you can have several servers (or several playgrounds) open side by side.
 
-- **Connect** to any MySQL server by host, port, user and password, with an optional database. Test a connection before you open it, and save favorites. Saved passwords are encrypted with the OS keychain.
-- **Playgrounds** are MySQL servers that Sequel Fidl runs in Docker for you. Pick MySQL 8.4 (LTS), 8.0 or 5.7, and optionally start from a sample database (World or Sakila).
+- **Connect** to MySQL or PostgreSQL by host, port, user and password. The engine selector supplies the appropriate defaults, including PostgreSQL port 5432 and database `postgres`. Test a connection before you open it, and save favorites. Saved passwords are encrypted with the OS keychain.
+- **Playgrounds** run either engine in Docker. Choose MySQL 8.4 (LTS), 8.0 or 5.7, or PostgreSQL 16, 17 or 18.
+- **Sample data**: MySQL offers World and Sakila. PostgreSQL offers the bundled **Bookshop** introduction: authors, books, customers, orders and order items, plus an order totals view. It includes foreign keys, identity columns, exact decimals, JSONB and arrays. Select it when creating a PostgreSQL playground; it imports automatically on first open without a separate download.
 - Each playground's data lives in a folder the app manages. The container starts when you open the playground and stops when its last window closes (or when the app quits). Your data is kept until you delete the playground.
 - Sequel Fidl talks to the Docker engine over its socket, so the Docker CLI isn't needed. Docker Desktop, OrbStack, Colima and Rancher Desktop are found automatically.
 
@@ -59,6 +60,7 @@ The launcher is the first window you see. Every connection opens in its own wind
 
 ### Browse and edit data
 
+- **Insert Record** opens a draft above the saved rows and focuses the first writable field. Enter values, choose NULL or keep database defaults, then review the SQL before inserting. Generated IDs and computed columns are filled automatically. Enter moves to the next field, ⌘/Ctrl+Enter reviews, and Escape discards the draft.
 - A fast data grid with column types in the headers. Click a header to sort, and page through large tables (choose the page size).
 - **Filters** with as many conditions as you need, joined with *and* or *or*. Operators: `=`, `≠`, contains, doesn't contain, starts with, ends with, `>`, `<`, `≥`, `≤`, between, in list, not in list, `LIKE`, `NOT LIKE`, is NULL, is not NULL.
 - **Select rows** (click, ⌘-click, ⇧-click) for bulk actions:
@@ -78,6 +80,8 @@ The **Structure** tab lists a table's columns, indexes and foreign keys next to 
 ![Columns, indexes and foreign keys of a table](docs/screenshots/structure.png)
 
 ### Create tables visually
+
+The **Auto increment** checkbox generates IDs automatically for integer columns. MySQL uses `AUTO_INCREMENT`; PostgreSQL uses an identity column backed by a sequence. New tables start with an auto-incrementing primary key.
 
 Right-click the empty part of the table list, or press **+** in the Tables header, to open the table wizard. It covers columns (type, length, unsigned, NULL, primary key, auto increment, default, on update, comment), indexes, foreign keys and table options. The SQL is generated as you go and shown for review before anything runs.
 
@@ -122,13 +126,14 @@ Connect a folder to a connection and its files appear in the explorer on the lef
 
 - **Commit…** first shows a review of what you're about to make permanent: every statement, the rows it changed per table, and any that failed. From there you can commit or roll back instead.
 - Statements MySQL can't run inside a transaction (`CREATE`, `ALTER`, `DROP`, `TRUNCATE` and so on) would silently commit it. Sequel Fidl warns you first.
+- PostgreSQL schema changes remain transactional. Editor statements and grid writes use savepoints inside an open transaction so a failed change can be corrected without discarding earlier work.
 - Closing a window or quitting with an open transaction asks you to commit or discard it.
 
 ![Reviewing a transaction before committing](docs/screenshots/transaction.png)
 
 ### Export
 
-Export a table (right-click it, or **Export…** in the Content toolbar, which keeps your current filters and sort) or the result of any query. Exports stream from MySQL to disk, so tables of any size work, and they read from one consistent, read-only snapshot.
+Export a table (right-click it, or **Export…** in the Content toolbar, which keeps your current filters and sort) or the result of any query. Exports stream from MySQL or PostgreSQL to disk and read from one consistent, read-only snapshot. PostgreSQL exports preserve big integers, exact decimals, fractional timestamps, arrays, JSONB and binary values.
 
 | Format | Options |
 | --- | --- |
@@ -165,6 +170,7 @@ Press ⌃` for a terminal under the editor, with tabs like VS Code's. Choose a p
 
 - **Shell**: your login shell, started in the project folder.
 - **MySQL**: a `mysql` client already connected to the window's server and database. For playgrounds it uses the client inside the playground's own container, so nothing needs installing. Otherwise it uses a local `mysql`/`mariadb` client, or a throwaway Docker container as a last resort. The password never appears on the command line.
+- **PostgreSQL**: a `psql` client connected to the current database. It uses the playground container, a local `psql`, or a temporary PostgreSQL client container. Local credentials use a temporary private `.pgpass` file that is removed when the terminal closes.
 
 ![A MySQL terminal connected to the sakila playground](docs/screenshots/terminal.png)
 
@@ -201,7 +207,7 @@ Dark and Light themes, or follow the system. Pick one from the palette icon or w
 
 - **macOS**. Sequel Fidl is developed and tested on macOS; Linux and Windows builds aren't tested yet.
 - **Docker** for playgrounds (Docker Desktop, OrbStack, Colima or Rancher Desktop). Direct connections work without it.
-- Optional: a local `mysql` client, used by the MySQL terminal for non-playground connections.
+- Optional: local `mysql` and/or `psql` clients for database terminals on non-playground connections.
 
 ## Getting started
 
@@ -218,6 +224,8 @@ If you run it from VS Code's integrated terminal, clear `ELECTRON_RUN_AS_NODE` f
 Build a packaged app with `yarn package`.
 
 The install step builds native modules for Electron, so macOS needs the Xcode Command Line Tools (`xcode-select --install`). The `postinstall` command supplies C++17 and `npm_config_dist_url` so both Yarn and npm use Electron's headers when compiling native modules with Node 24.
+
+For database extension points and PostgreSQL integration test instructions, see [Database dialects](docs/database-dialects.md).
 
 ## Where your data lives
 

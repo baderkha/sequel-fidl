@@ -1,4 +1,6 @@
 import React from 'react';
+import { useDatabaseDialect } from 'renderer/database/DialectContext';
+import { POSTGRES_TYPES, postgresTypeInfo, buildPostgresSQL, buildPostgresAlter, validatePostgres } from './postgres';
 import {
     ArrowDown,
     ArrowLeft,
@@ -76,7 +78,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'options', label: 'Options', icon: <Settings2 size={14} /> },
 ];
 
-const TYPE_GROUPS = Array.from(new Set(TYPES.map((t) => t.group)));
+
 
 const FALLBACK_ENGINES = ['InnoDB', 'MyISAM', 'MEMORY', 'ARCHIVE', 'CSV'];
 const FALLBACK_COLLATIONS: Record<string, string[]> = {
@@ -97,10 +99,15 @@ const DEFAULT_PARAMS: Record<string, string> = {
  * Visual CREATE TABLE builder with a live sql preview and a review step
  */
 export function CreateTableWizard(p: CreateTableWizardProps) {
+    const dialect = useDatabaseDialect();
+    const postgres = dialect === 'postgres';
+    const types = postgres ? POSTGRES_TYPES : TYPES;
+    const TYPE_GROUPS = Array.from(new Set(types.map((t) => t.group)));
+    const infoFor = postgres ? postgresTypeInfo : typeInfo;
     const editing = !!p.edit;
     const [def, setDef] = React.useState<TableDef>(() => {
         if (!p.edit) {
-            return newTable();
+            return newTable(dialect);
         }
         const d = cloneDef(p.edit.original);
         if (p.edit.add === 'column') d.columns.push(newColumn());
@@ -122,6 +129,7 @@ export function CreateTableWizard(p: CreateTableWizardProps) {
 
     // ask the server what it supports , keep the fallbacks if that fails
     React.useEffect(() => {
+        if (postgres) return;
         api.runQuery(p.conID, 'SHOW ENGINES').then(([rows, err]) => {
             if (!err && Array.isArray(rows)) {
                 const list = rows
@@ -143,12 +151,12 @@ export function CreateTableWizard(p: CreateTableWizardProps) {
     }, [p.conID]);
 
     const statements = React.useMemo(
-        () => (p.edit ? buildAlterStatements(p.edit.original, def) : [buildSQL(def)]),
+        () => (p.edit ? (postgres ? buildPostgresAlter : buildAlterStatements)(p.edit.original,def) : [(postgres ? buildPostgresSQL : buildSQL)(def)]),
         [def]
     );
     const sql = statements.length ? statements.join('\n\n') : '-- No changes yet';
     const problems = React.useMemo(() => {
-        const list = validate(def, p.tables);
+        const list = (postgres ? validatePostgres : validate)(def,p.tables);
         if (editing && !statements.length) {
             list.push({ tab: 'columns', field: 'none', message: 'No changes yet' });
         }
@@ -173,7 +181,7 @@ export function CreateTableWizard(p: CreateTableWizardProps) {
                 }
                 const next = { ...c, ...patch };
                 if (patch.type && patch.type !== c.type) {
-                    const t = typeInfo(patch.type);
+                    const t = infoFor(patch.type);
                     next.param = DEFAULT_PARAMS[patch.type] || '';
                     next.unsigned = next.unsigned && !!t.numeric;
                     next.autoIncrement = next.autoIncrement && !!t.integer;
@@ -187,6 +195,7 @@ export function CreateTableWizard(p: CreateTableWizardProps) {
                 }
                 if (patch.autoIncrement) {
                     next.defaultMode = 'none';
+                    next.nullable = false;
                     if (!d.columns.some((x) => x.primaryKey)) {
                         next.primaryKey = true;
                         next.nullable = false;
@@ -269,6 +278,13 @@ export function CreateTableWizard(p: CreateTableWizardProps) {
     const create = async () => {
         setRunning(true);
         setRunError('');
+        if (postgres) {
+            const result = await api.applySchemaChanges(p.conID,statements);
+            setRunning(false);
+            if (result.error) { setRunError(result.error); return; }
+            p.onCreated(def.name.trim());
+            return;
+        }
         for (let i = 0; i < statements.length; i++) {
             // eslint-disable-next-line no-await-in-loop
             const [, err] = await api.runQuery(p.conID, statements[i]);
@@ -300,17 +316,17 @@ export function CreateTableWizard(p: CreateTableWizardProps) {
                     <span>Name</span>
                     <span>Type</span>
                     <span>Length / Values</span>
-                    <span title="Unsigned">Unsig.</span>
+                    <span title={postgres ? 'PostgreSQL uses signed numeric types' : 'Unsigned'}>{postgres ? '—' : 'Unsig.'}</span>
                     <span title="Allow NULL">Null</span>
                     <span title="Primary key">PK</span>
-                    <span title="Auto increment">A_I</span>
+                    <span title={postgres ? 'An identity column backed by a sequence' : 'Generate a new ID automatically'}>Auto increment</span>
                     <span>Default</span>
                     <span title="ON UPDATE CURRENT_TIMESTAMP">On upd.</span>
                     <span>Comment</span>
                     <span />
                 </div>
                 {def.columns.map((c, i) => {
-                    const t = typeInfo(c.type);
+                    const t = infoFor(c.type);
                     return (
                         <fieldset
                             key={c.id}
@@ -323,19 +339,22 @@ export function CreateTableWizard(p: CreateTableWizardProps) {
                             </span>
                             <input
                                 id={`col-name-${c.id}`}
+                                aria-label={`Column ${i + 1} name`}
                                 className={`input is-mono ${inv(`col:${c.id}:name`)}`}
                                 value={c.name}
                                 placeholder="column_name"
                                 onChange={(ev) => updateColumn(c.id, { name: ev.target.value })}
                             />
                             <select
+                                aria-label={`Type for ${c.name || `column ${i + 1}`}`}
                                 className="select"
                                 value={c.type}
                                 onChange={(ev) => updateColumn(c.id, { type: ev.target.value })}
                             >
+                                {!types.some((t) => t.name === c.type) && <option value={c.type}>{c.type}</option>}
                                 {TYPE_GROUPS.map((g) => (
                                     <optgroup key={g} label={g}>
-                                        {TYPES.filter((x) => x.group === g).map((x) => (
+                                        {types.filter((x) => x.group === g).map((x) => (
                                             <option key={x.name} value={x.name}>
                                                 {x.name}
                                             </option>
@@ -353,13 +372,14 @@ export function CreateTableWizard(p: CreateTableWizardProps) {
                             <input
                                 type="checkbox"
                                 checked={c.unsigned}
-                                disabled={!t.numeric}
+                                disabled={postgres || !t.numeric}
                                 onChange={(ev) => updateColumn(c.id, { unsigned: ev.target.checked })}
                             />
                             <input
                                 type="checkbox"
-                                checked={c.nullable && !c.primaryKey}
-                                disabled={c.primaryKey}
+                                aria-label={`Allow NULL for ${c.name || `column ${i + 1}`}`}
+                                checked={c.nullable && !c.primaryKey && !c.autoIncrement}
+                                disabled={c.primaryKey || c.autoIncrement}
                                 onChange={(ev) => updateColumn(c.id, { nullable: ev.target.checked })}
                             />
                             <input
@@ -372,6 +392,8 @@ export function CreateTableWizard(p: CreateTableWizardProps) {
                                 type="checkbox"
                                 className={inv(`col:${c.id}:ai`)}
                                 checked={c.autoIncrement}
+                                aria-label={`Auto increment for ${c.name || `column ${i + 1}`}`}
+                                title={postgres ? 'Generate values using an identity sequence' : 'Generate values using AUTO_INCREMENT'}
                                 disabled={!t.integer && !c.autoIncrement}
                                 onChange={(ev) =>
                                     updateColumn(c.id, { autoIncrement: ev.target.checked })
@@ -414,7 +436,7 @@ export function CreateTableWizard(p: CreateTableWizardProps) {
                             <input
                                 type="checkbox"
                                 checked={c.onUpdateNow}
-                                disabled={!t.temporal}
+                                disabled={postgres || !t.temporal}
                                 onChange={(ev) => updateColumn(c.id, { onUpdateNow: ev.target.checked })}
                             />
                             <input
@@ -455,6 +477,9 @@ export function CreateTableWizard(p: CreateTableWizardProps) {
                     );
                 })}
             </div>
+            <p className="ct-hint ct-auto-increment-note">{postgres
+                ? 'Auto increment uses GENERATED BY DEFAULT AS IDENTITY, backed by a PostgreSQL sequence. Leave the ID empty when inserting a record.'
+                : 'Auto increment uses MySQL AUTO_INCREMENT. Leave the ID empty when inserting a record.'}</p>
             <datalist id="ct-exprs">
                 <option value="CURRENT_TIMESTAMP" />
                 <option value="CURRENT_TIMESTAMP(3)" />
@@ -469,7 +494,7 @@ export function CreateTableWizard(p: CreateTableWizardProps) {
                     type="button"
                     className="btn is-ghost"
                     disabled={def.columns.some((c) => c.name === 'created_at')}
-                    onClick={() => set({ columns: [...def.columns, ...timestampColumns()] })}
+                    onClick={() => set({ columns: [...def.columns, ...(postgres ? timestampColumns().map((c) => ({ ...c,type:'TIMESTAMPTZ',onUpdateNow:false })) : timestampColumns())] })}
                 >
                     <Clock size={13} /> Add created_at / updated_at
                 </button>
@@ -508,8 +533,8 @@ export function CreateTableWizard(p: CreateTableWizardProps) {
                     >
                         <option value="INDEX">INDEX</option>
                         <option value="UNIQUE">UNIQUE</option>
-                        <option value="FULLTEXT">FULLTEXT</option>
-                        <option value="SPATIAL">SPATIAL</option>
+                        {!postgres && <option value="FULLTEXT">FULLTEXT</option>}
+                        {!postgres && <option value="SPATIAL">SPATIAL</option>}
                     </select>
                     <input
                         className={`input is-mono ${inv(`idx:${idx.id}:name`)}`}
@@ -529,7 +554,7 @@ export function CreateTableWizard(p: CreateTableWizardProps) {
                             return (
                                 !!col &&
                                 (idx.kind === 'INDEX' || idx.kind === 'UNIQUE') &&
-                                (!!typeInfo(col.type).textual || /BLOB|BINARY/.test(col.type))
+                                (!!infoFor(col.type).textual || /BLOB|BINARY/.test(col.type))
                             );
                         }}
                         onLengths={(lengths) => updateIndex(idx.id, { lengths })}
@@ -681,7 +706,7 @@ export function CreateTableWizard(p: CreateTableWizardProps) {
     );
 
     const charsetCollations = collations[def.options.charset] || [];
-    const renderOptions = () => (
+    const renderOptions = () => postgres ? (<div className="field"><span className="field-label">Comment</span><input className="app-input" value={def.options.comment} onChange={(ev) => setOptions({ comment:ev.target.value })} /></div>) : (
         <div className="ct-form">
             <span className="field-label">Engine</span>
             <select

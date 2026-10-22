@@ -5,7 +5,8 @@ import path from 'path';
 import { Sequelize } from 'sequelize';
 import { v4 } from 'uuid';
 import { splitStatements } from '../../../shared/sql/statements';
-import { MYSQLAdminCommand } from '../../util/sql_admin_commands/MYSQLAdminCommand';
+import { adminFor } from '../../util/sql_admin_commands/runners';
+import { PostgresSource } from './PostgresSource';
 import { ConManager } from '../Connections';
 import { Transactions } from '../Transactions';
 import { compressorDescriptors, compressorFor } from './compressors';
@@ -77,7 +78,6 @@ type Planned = { source: RowSource; transforms: RowTransform[]; name: string };
 export class ExportService {
     private static _instance: ExportService;
     private jobs = new Map<string, AbortController>();
-    private admin = new MYSQLAdminCommand();
 
     static Default(): ExportService {
         if (!ExportService._instance) ExportService._instance = new ExportService();
@@ -95,8 +95,8 @@ export class ExportService {
     }
 
     /** a query source must be exactly one statement that only reads */
-    static validateQuery(sql: string): string {
-        const stmts = splitStatements(sql || '');
+    static validateQuery(sql: string, dialect: 'mysql' | 'postgres' = 'mysql'): string {
+        const stmts = splitStatements(sql || '',dialect);
         if (stmts.length !== 1) throw new Error(stmts.length ? 'Export one statement at a time.' : 'There is no statement to export.');
         const text = stripLeadingComments(stmts[0].text);
         if (!READ_ONLY.test(text)) throw new Error('Only statements that return rows (SELECT , WITH , SHOW …) can be exported.');
@@ -108,6 +108,8 @@ export class ExportService {
         opts: { preview?: boolean; columnsOnly?: boolean; connection?: unknown } = {}
     ): Planned {
         const con = this.connection(req.conID);
+        const admin = adminFor(con.getDialect());
+        const Source = con.getDialect() === 'postgres' ? PostgresSource : MySQLSource;
         const transaction = Transactions.get(req.conID);
         const shared = opts.connection;
         const spec: ExportSourceSpec = req.source;
@@ -123,9 +125,9 @@ export class ExportService {
                 orderByCol: spec.orderBy,
                 orderDir: spec.orderDir,
             };
-            const [sql, args] = this.admin.BuildSelect({ ...table, limit: cap });
-            const [countSql, countArgs] = this.admin.BuildCount(spec.table, spec.filters, spec.filterMode);
-            const source = new MySQLSource(con, sql, args, { transaction, connection: shared, count: { sql: countSql, args: countArgs } });
+            const [sql, args] = admin.BuildSelect({ ...table, limit: cap });
+            const [countSql, countArgs] = admin.BuildCount(spec.table, spec.filters, spec.filterMode);
+            const source = new Source(con, sql, args, { transaction, connection: shared, count: { sql: countSql, args: countArgs } });
             const counted: RowSource = {
                 open: () => source.open(),
                 count: async () => {
@@ -136,11 +138,11 @@ export class ExportService {
             return { source: counted, transforms: [normalize()], name: spec.table };
         }
 
-        const sql = ExportService.validateQuery(spec.sql);
+        const sql = ExportService.validateQuery(spec.sql,con.getDialect() as 'mysql' | 'postgres');
         const transforms: RowTransform[] = [normalize()];
         if (req.columns?.length) transforms.push(pickColumns(req.columns));
         if (cap !== undefined) transforms.push(limitRows(cap));
-        return { source: new MySQLSource(con, sql, [], { transaction, connection: shared }), transforms, name: 'query' };
+        return { source: new Source(con, sql, [], { transaction, connection: shared }), transforms, name: 'query' };
     }
 
     /** the columns the source produces (for picking them in the dialog) */
@@ -317,7 +319,7 @@ export class ExportService {
             if (req.snapshot && !Transactions.isOpen(req.conID)) {
                 try {
                     shared = await manager.getConnection({ type: 'read' });
-                    await rawQuery(shared, 'START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY');
+                    await rawQuery(shared, con.getDialect() === 'postgres' ? 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY' : 'START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY');
                 } catch (err) {
                     if (shared) manager.releaseConnection(shared);
                     shared = null;

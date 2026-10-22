@@ -2,6 +2,7 @@
  * Create table wizard model + MySQL DDL generation.
  * Everything here is pure so the preview is exactly what gets executed.
  */
+import type { DatabaseType } from 'shared/db/dialects';
 
 export type ParamKind = 'none' | 'optional' | 'required' | 'values';
 
@@ -80,6 +81,7 @@ export type ColumnDef = {
     nullable: boolean;
     primaryKey: boolean;
     autoIncrement: boolean;
+    identityMode?: 'ALWAYS' | 'BY DEFAULT';
     defaultMode: DefaultMode;
     defaultValue: string;
     onUpdateNow: boolean;
@@ -89,6 +91,7 @@ export type ColumnDef = {
 export type IndexKind = 'INDEX' | 'UNIQUE' | 'FULLTEXT' | 'SPATIAL';
 
 export type IndexDef = {
+    constraintName?: string;
     id: number;
     /** name on the server , undefined for a new index */
     origName?: string;
@@ -118,6 +121,7 @@ export type ForeignKeyDef = {
 };
 
 export type TableOptions = {
+    primaryKeyName?: string;
     engine: string;
     charset: string;
     collation: string;
@@ -163,15 +167,16 @@ export const newColumn = (patch: Partial<ColumnDef> = {}): ColumnDef => ({
     ...patch,
 });
 
-export const idColumn = () =>
+export const idColumn = (dialect: DatabaseType = 'mysql') =>
     newColumn({
         name: 'id',
-        type: 'INT',
+        type: dialect === 'postgres' ? 'INTEGER' : 'INT',
         param: '',
-        unsigned: true,
+        unsigned: dialect === 'mysql',
         nullable: false,
         primaryKey: true,
         autoIncrement: true,
+        identityMode: dialect === 'postgres' ? 'BY DEFAULT' : undefined,
     });
 
 export const timestampColumns = () => [
@@ -194,14 +199,14 @@ export const timestampColumns = () => [
     }),
 ];
 
-export const newTable = (): TableDef => ({
+export const newTable = (dialect: DatabaseType = 'mysql'): TableDef => ({
     name: '',
-    columns: [idColumn()],
+    columns: [idColumn(dialect)],
     indexes: [],
     foreignKeys: [],
     options: {
-        engine: 'InnoDB',
-        charset: 'utf8mb4',
+        engine: dialect === 'mysql' ? 'InnoDB' : '',
+        charset: dialect === 'mysql' ? 'utf8mb4' : '',
         collation: '',
         autoIncrementStart: '',
         comment: '',

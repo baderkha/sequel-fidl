@@ -2,12 +2,16 @@ import { net } from 'electron';
 import { existsSync, mkdirSync, renameSync, writeFileSync } from 'fs';
 import path from 'path';
 import { BASE_APP_DATA_PATH } from '../util/application/path';
+import { DatabaseType } from '../../shared/db/dialects';
+import { POSTGRES_INTRO_SQL } from './postgresSample';
 
 /**
- * Official MySQL sample databases a playground can start with
+ * MySQL sample archives and the bundled PostgreSQL introduction.
  * https://dev.mysql.com/doc/index-other.html
  */
 export type SampleDB = {
+    type: DatabaseType;
+    sql?: string;
     id: string;
     name: string;
     description: string;
@@ -20,6 +24,7 @@ export type SampleDB = {
 
 export const SAMPLES: SampleDB[] = [
     {
+        type: 'mysql',
         id: 'world',
         name: 'World',
         description: 'Countries, cities and languages. 3 tables, ~5,000 rows. The simplest place to start.',
@@ -28,12 +33,18 @@ export const SAMPLES: SampleDB[] = [
         database: 'world',
     },
     {
+        type: 'mysql',
         id: 'sakila',
         name: 'Sakila',
         description: 'A DVD rental store: films, actors, customers, rentals. 16 tables with views and triggers, the classic MySQL tutorial schema.',
         url: 'https://downloads.mysql.com/docs/sakila-db.tar.gz',
         files: ['sakila-db/sakila-schema.sql', 'sakila-db/sakila-data.sql'],
         database: 'sakila',
+    },
+    {
+        type: 'postgres', id: 'bookshop', name: 'Bookshop',
+        description: 'Authors, books, customers and orders. Five tables and a view for learning joins, aggregates, JSONB and arrays.',
+        database: 'main_db', sql: POSTGRES_INTRO_SQL, url: '', files: [],
     },
 ];
 

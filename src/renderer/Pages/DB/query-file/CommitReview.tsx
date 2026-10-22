@@ -135,7 +135,7 @@ export function CommitReview(p: {
                     )}
                     {failed.length > 0 && (
                         <div className="ct-hint">
-                            Failed statements didn't change anything , MySQL only undid that one statement.
+                            Failed statements were rolled back. Earlier successful statements remain in this transaction.
                         </div>
                     )}
                 </>

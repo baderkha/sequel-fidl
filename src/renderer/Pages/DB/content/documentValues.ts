@@ -4,7 +4,7 @@ import { cellToText } from 'renderer/Components/DataGrid/format';
 export type DocumentValue = null | boolean | number | string | DocumentValue[] | { [key: string]: DocumentValue };
 export type RecordDocument = { [key: string]: DocumentValue };
 
-export const isJSONColumn = (column?: ColSchema) => /^json\b/i.test(column?.Type || '');
+export const isJSONColumn = (column?: ColSchema) => /^jsonb?\b/i.test(column?.Type || '');
 
 export function binaryBytes(value: any): Uint8Array | null {
     if (value instanceof Uint8Array) return value;
@@ -79,6 +79,7 @@ export function recordAssignments(row: Record<string, any>, schema: ColSchema[],
             return [{ column: key, mode: 'null' }];
         }
         if (isJSONColumn(column)) return [{ column: key, mode: 'value', value: JSON.stringify(value) }];
+        if (/\[\]$/.test(column?.Type || '') && Array.isArray(value)) return [{ column: key, mode: 'value', value }];
         if (typeof value === 'object') throw new Error(`Column "${key}" expects a scalar value, not an object or array.`);
         return [{ column: key, mode: 'value', value }];
     });

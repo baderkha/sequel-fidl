@@ -5,6 +5,7 @@ import { ContextMenu, MenuEntry, useContextMenu } from '../ui/ContextMenu';
 import { Modal } from '../ui/Modal';
 import { useToast } from '../ui/Toasts';
 import { CellEditor } from './CellEditor';
+import { DraftRow, GridDraft } from './DraftRow';
 import { columnTypeHint } from './typeHint';
 import {
     cellToText,
@@ -50,6 +51,8 @@ export type DataGridProps = {
     selectionMenu?: (selection: Set<number>) => MenuEntry[];
     /** Requests confirmation of a changed cell; the grid never writes data itself. */
     onCellEdit?: (edit: GridCellEdit) => void;
+    /** Editable local record shown before the saved rows. */
+    draft?: GridDraft;
 };
 
 const EMPTY = new Set<number>();
@@ -487,6 +490,7 @@ export function DataGrid(p: DataGridProps) {
                         );
                     })}
                 </div>
+                {p.draft && <DraftRow {...p.draft} columns={columns} columnWidth={colW} gutterWidth={gutterW} width={totalW} />}
                 <div
                     className="grid-body"
                     style={{ height: virtualizer.getTotalSize(), width: totalW, minWidth: '100%' }}
@@ -615,7 +619,7 @@ export function DataGrid(p: DataGridProps) {
                         );
                     })}
                 </div>
-                {!rows.length && !p.loading && (
+                {!rows.length && !p.loading && !p.draft && (
                     <div className="grid-empty">{p.empty || 'No rows'}</div>
                 )}
             </div>

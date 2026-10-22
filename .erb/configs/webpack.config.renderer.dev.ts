@@ -156,7 +156,7 @@ const configuration: webpack.Configuration = {
 
     new ReactRefreshWebpackPlugin(),
 
-    new MonacoWebpackPlugin({ languages: ['mysql', 'sql'] }),
+    new MonacoWebpackPlugin({ languages: ['mysql', 'pgsql', 'sql'] }),
 
     new HtmlWebpackPlugin({
       filename: path.join('index.html'),

@@ -15,6 +15,7 @@ import {
 import { ConManager } from './Connections';
 import { waitTillConnection } from './db/ConnectionFactory';
 import { MYSQLAdminCommand } from '../util/sql_admin_commands/MYSQLAdminCommand';
+import { PostgresAdminCommand } from '../util/sql_admin_commands/PostgresAdminCommand';
 import { ErrorTuple, NewErrorTuple } from '../util/tuple';
 import { commitsImplicitly, describeStatement, endsTransaction, Transactions } from './Transactions';
 
@@ -49,6 +50,14 @@ export class SQLService {
         return this.adminSQLRunner.get(dialect as DBType);
     }
 
+    private logValue(con: Sequelize, value: any): string {
+        if (value instanceof Uint8Array) value = Buffer.from(value);
+        if (value && typeof value === 'object' && !(value instanceof Date) && !Array.isArray(value)) {
+            return con.escape(JSON.stringify(value));
+        }
+        return con.escape(value);
+    }
+
     /** readable WHERE for a list of row keys (values inlined , long lists shortened) , for the transaction log */
     private keysForLog(con: Sequelize, keys: RowKey[]): string {
         const q = (c: string) => this.rnr(con.getDialect()).QuoteIdent(c);
@@ -57,10 +66,10 @@ export class SQLService {
         const rest = keys.length - shown.length;
         const tail = rest > 0 ? ` /* … ${rest} more */` : '';
         if (cols.length === 1) {
-            return `${q(cols[0])} IN (${shown.map((k) => con.escape(k[cols[0]])).join(', ')}${tail})`;
+            return `${q(cols[0])} IN (${shown.map((k) => this.logValue(con,k[cols[0]])).join(', ')}${tail})`;
         }
         return `${shown
-            .map((k) => `(${cols.map((c) => `${q(c)} <=> ${con.escape(k[c])}`).join(' AND ')})`)
+            .map((k) => `(${cols.map((c) => `${q(c)} ${this.rnr(con.getDialect()).NullComparison()} ${this.logValue(con,k[c])}`).join(' AND ')})`)
             .join(' OR ')}${tail}`;
     }
 
@@ -89,6 +98,7 @@ export class SQLService {
         if (!SQLService._instance) {
             let mp: Map<DBType, AdminSQLCommand> = new Map();
             mp.set('mysql', new MYSQLAdminCommand());
+            mp.set('postgres', new PostgresAdminCommand());
             SQLService._instance = new SQLService(ConManager.GetInstance(), mp);
         }
         return SQLService._instance;
@@ -128,7 +138,7 @@ export class SQLService {
             return NewErrorTuple([], new Error('no valid connection !'));
         }
         let transaction = Transactions.get(conID);
-        if (transaction && commitsImplicitly(query)) {
+        if (transaction && con.getDialect() === 'mysql' && commitsImplicitly(query)) {
             if (!opts.commitFirst) {
                 return NewErrorTuple(
                     [],
@@ -144,7 +154,11 @@ export class SQLService {
             transaction = undefined;
         }
         try {
-            const data = await con.query(query, { transaction });
+            // PostgreSQL aborts a transaction after a failed statement. A savepoint
+            // preserves the app's transaction so the user can correct the query.
+            const data = transaction && con.getDialect() === 'postgres'
+                ? await con.transaction({ transaction }, (savepoint) => con.query(query, { transaction: savepoint }))
+                : await con.query(query, { transaction });
             if (transaction) {
                 const res: any = data[0];
                 Transactions.record(conID, {
@@ -201,7 +215,7 @@ export class SQLService {
         if (!con) {
             return Promise.resolve([]);
         }
-        return this.rnr(con.getDialect()).ShowAllTables(con);
+        return this.rnr(con.getDialect()).ShowAllTables(con, Transactions.get(conID));
     }
     /**
      * Get the DDL stmt for table
@@ -213,7 +227,7 @@ export class SQLService {
         if (!con) {
             return Promise.resolve('');
         }
-        return this.rnr(con.getDialect()).ShowCreateSQL(con, tableName);
+        return this.rnr(con.getDialect()).ShowCreateSQL(con, tableName, Transactions.get(conID));
     }
     /**
      * Get Schema for a table
@@ -225,7 +239,26 @@ export class SQLService {
         if (!con) {
             return Promise.resolve([]);
         }
-        return this.rnr(con.getDialect()).ShowSchema(con, tableName);
+        return this.rnr(con.getDialect()).ShowSchema(con, tableName, Transactions.get(conID));
+    }
+
+    async TableMetadata(conID: string, tableName: string) {
+        const [, con] = this.conMgr.GetConById(conID);
+        if (!con) throw new Error('The connection is closed.');
+        return this.rnr(con.getDialect()).GetTableMetadata(con, tableName, Transactions.get(conID));
+    }
+
+    async ApplySchemaChanges(conID: string, statements: string[]): Promise<{ error?: string }> {
+        const [, con] = this.conMgr.GetConById(conID);
+        if (!con) return { error:'The connection is closed.' };
+        if (con.getDialect() !== 'postgres') return { error:'Use the MySQL schema editor for this connection.' };
+        try {
+            await con.transaction({ transaction:Transactions.get(conID) }, async (transaction) => {
+                for (const statement of statements) await con.query(statement,{ transaction });
+            });
+            if (Transactions.isOpen(conID)) statements.forEach((sql) => Transactions.record(conID,{ sql,...describeStatement(sql),source:'editor' }));
+            return {};
+        } catch (err) { return { error:(err as Error).message }; }
     }
     /**
      * Get all the schemas for a db
@@ -371,8 +404,11 @@ export class SQLService {
             );
         }
         const q = (c: string) => this.rnr(con.getDialect()).QuoteIdent(c);
-        const shown = rows.slice(0, 3).map((r) => `(${r.map((v) => con.escape(v)).join(', ')})`);
-        const logSQL = `INSERT ${ignore ? 'IGNORE ' : ''}INTO ${q(tableName)} (${columns.map(q).join(', ')}) VALUES ${shown.join(', ')}${
+        const postgres = con.getDialect() === 'postgres';
+        const shown = rows.slice(0, 3).map((r) => `(${r.map((v) => this.logValue(con,v)).join(', ')})`);
+        const logSQL = postgres && !columns.length
+            ? rows.slice(0, 3).map(() => `INSERT INTO ${this.rnr(con.getDialect()).QuoteTable(tableName)} DEFAULT VALUES${ignore ? ' ON CONFLICT DO NOTHING' : ''};`).join('\n')
+            : `INSERT ${ignore && !postgres ? 'IGNORE ' : ''}INTO ${this.rnr(con.getDialect()).QuoteTable(tableName)} (${columns.map(q).join(', ')}) VALUES ${shown.join(', ')}${ignore && postgres ? ' ON CONFLICT DO NOTHING' : ''}${
             rows.length > 3 ? ` /* … ${rows.length - 3} more rows */` : ''
         }`;
         return this.rnr(con.getDialect())
@@ -390,7 +426,7 @@ export class SQLService {
         if (!con) {
             return Promise.resolve(NewErrorTuple(0, new Error('no valid connection !')));
         }
-        const logSQL = `DELETE FROM ${this.rnr(con.getDialect()).QuoteIdent(tableName)} WHERE ${this.keysForLog(con, keys)}${
+        const logSQL = `DELETE FROM ${this.rnr(con.getDialect()).QuoteTable(tableName)} WHERE ${this.keysForLog(con, keys)}${
             byAllColumns ? ' /* one LIMIT 1 delete per row */' : ''
         }`;
         return this.rnr(con.getDialect())
@@ -418,10 +454,10 @@ export class SQLService {
                     ? `${q(a.column)} = DEFAULT`
                     : a.mode === 'expression'
                     ? `${q(a.column)} = ${a.value}`
-                    : `${q(a.column)} = ${con.escape(a.value)}`
+                    : `${q(a.column)} = ${this.logValue(con,a.value)}`
             )
             .join(', ');
-        const logSQL = `UPDATE ${q(tableName)} SET ${assignments} WHERE ${this.keysForLog(con, keys)}`;
+        const logSQL = `UPDATE ${this.rnr(con.getDialect()).QuoteTable(tableName)} SET ${assignments} WHERE ${this.keysForLog(con, keys)}`;
         return this.rnr(con.getDialect())
             .UpdateRows(con, tableName, set, keys, byAllColumns, Transactions.get(conID))
             .then((res) => this.logGridWrite(conID, res, 'UPDATE', tableName, logSQL));
@@ -480,7 +516,7 @@ export class SQLService {
         if (!con) {
             return null;
         }
-        return this.rnr(con.getDialect()).ShowCreateSQL(con, tableName);
+        return this.rnr(con.getDialect()).ShowCreateSQL(con, tableName, Transactions.get(conID));
     }
 
     RenameTable(

@@ -2,7 +2,7 @@ import { QueryTypes, Sequelize, Transaction } from 'sequelize';
 import { columnFromField, DriverField } from './columns';
 import { OpenedSource, Row, RowSource } from './types';
 
-export type MySQLSourceOptions = {
+export type SQLSourceOptions = {
     /** run on this transaction's connection (sees its uncommitted changes) instead of a pooled one */
     transaction?: Transaction;
     /**
@@ -29,9 +29,9 @@ export class MySQLSource implements RowSource {
     private con: Sequelize;
     private sql: string;
     private args: unknown[];
-    private opts: MySQLSourceOptions;
+    private opts: SQLSourceOptions;
 
-    constructor(con: Sequelize, sql: string, args: unknown[], opts: MySQLSourceOptions = {}) {
+    constructor(con: Sequelize, sql: string, args: unknown[], opts: SQLSourceOptions = {}) {
         this.con = con;
         this.sql = sql;
         this.args = args;

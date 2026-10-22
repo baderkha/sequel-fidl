@@ -1,4 +1,4 @@
-import { ContainerState, IDocker } from '../docker/DockerRunner';
+import { IDocker } from '../docker/DockerRunner';
 import { BaseDockerDB } from './BaseDockerDB';
 import {
     DBProcStartOptions,
@@ -7,9 +7,7 @@ import {
     DEFAULT_GENERATED_DB_NAME,
     IDBProcess,
 } from '../../util/db_process';
-import { mkdirSync, rmSync } from 'fs';
-import { UNEXPECTED_ERROR_LOG } from '../pubsub';
-import { ipcMain } from 'electron';
+import { mkdirSync } from 'fs';
 
 /**
  * MYSQL Process manger via docker.
@@ -26,20 +24,6 @@ export class MYSQLDocker extends BaseDockerDB implements IDBProcess {
     ) {
         super(docker, '/var/lib/mysql', baseAppPath);
         this.rootPwddefault = rootPwdDefault;
-    }
-
-    IsAvailable(): Promise<boolean> {
-        return this.docker.Ping();
-    }
-
-    State(processID: string): Promise<ContainerState> {
-        return this.docker.ContainerState(processID);
-    }
-
-    async StartUp(version: string, opts?: DBProcStartOptions): Promise<DBProcTpl> {
-        const id = this.generateContainerId();
-        const path = this.getAppContainerPath(id);
-        return this.StartUpFromExisting(path, version, id, opts);
     }
 
     /**
@@ -83,19 +67,6 @@ export class MYSQLDocker extends BaseDockerDB implements IDBProcess {
             : Promise.resolve([out, null]);
     }
 
-    async ShutDown(
-        processID: string,
-        statePathToDelete?: string
-    ): Promise<boolean> {
-        // graceful stop so mysql flushes its data to the volume , then drop the container
-        await this.docker.StopContainer(processID, 20);
-        const removed = await this.docker.RemoveContainer(processID);
-        if (statePathToDelete) {
-            await this.DeleteState(statePathToDelete);
-        }
-        return removed;
-    }
-
     async ImportArchive(
         processID: string,
         archivePath: string,
@@ -136,14 +107,4 @@ export class MYSQLDocker extends BaseDockerDB implements IDBProcess {
         }
     }
 
-    DeleteState(statePathToDelete: string): Promise<void> {
-        try {
-            rmSync(statePathToDelete, { recursive: true, force: true });
-        } catch (err) {
-            const msg = `unexpected folder delete err ${err}`;
-            ipcMain.emit(UNEXPECTED_ERROR_LOG, msg);
-        }
-
-        return Promise.resolve();
-    }
 }

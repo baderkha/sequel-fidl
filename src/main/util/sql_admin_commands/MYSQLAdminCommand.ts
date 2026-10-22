@@ -9,7 +9,7 @@ export class MYSQLAdminCommand extends AdminSQLCommand {
     ShowCreateTable(con: Sequelize, tableName: string): Promise<string> {
         return con
             .query(`SHOW CREATE TABLE ${this.QuoteIdent(tableName)}`)
-            .then((res) => res[0] as string)
+            .then((res) => String((res[0][0] as any)?.['Create Table'] || (res[0][0] as any)?.['Create View'] || ''))
             .catch(() => '');
     }
     RenameTable(
@@ -50,8 +50,7 @@ export class MYSQLAdminCommand extends AdminSQLCommand {
             .query(`SHOW CREATE TABLE ${this.QuoteIdent(tableName)}`)
             .then((data) => {
                 const dat = data[0][0];
-                const idx = 'Create Table';
-                return (dat as any)[idx];
+                return (dat as any)['Create Table'] || (dat as any)['Create View'] || '';
             })
             .catch(() => '');
     }
