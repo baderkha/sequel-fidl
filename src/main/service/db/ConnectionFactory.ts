@@ -58,6 +58,11 @@ export const waitTillConnection = async (
     }
 };
 
+/**
+ * create an ssh forwarding tunnel that can be used for db cons that need a jumpbox
+ * @param cfg 
+ * @returns 
+ */
 export const CreateSSHForwardingTunnel = async (
     cfg: ConnectionConfig,
 ): Promise<ErrorTuple<net.Server>> {
