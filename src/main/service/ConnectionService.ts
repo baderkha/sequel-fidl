@@ -23,6 +23,15 @@ export type SavedConnection = {
     hasPassword: boolean;
 };
 
+
+export type SSHConnection = {
+    host: string;
+    port: number | string;
+    username: string;
+    password?: string;
+    privateKey?: Buffer;
+}
+
 export type ConnectionInput = {
     type?: DatabaseType;
     /** set when it's a saved connection */
@@ -34,6 +43,7 @@ export type ConnectionInput = {
     /** undefined => keep the saved password */
     password?: string;
     database: string;
+    ssh?: SSHConnection
 };
 
 const toSaved = (row: any): SavedConnection => ({
@@ -124,6 +134,7 @@ export class ConnectionService {
             username: input.username,
             password: password || '',
             database: input.database,
+            ssh: input.ssh
         };
     }
 
